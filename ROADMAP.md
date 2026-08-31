@@ -13,32 +13,42 @@
 - Recherche sémantique on-device (NLEmbedding), didacticiel mascotte, modals suggestion/notation
 - 7 tests UI verts, correctifs ultrareview appliqués
 
-## V1.1 « La différence » — cible octobre 2026
+## V1.1 « La différence » — ✅ livrée (31/08/2026)
 
-Priorités (ordre du ranking « features vendeuses ») :
-
-1. **Monétisation** — ✅ côté app livré (31/08/2026) : paywall Picpic Pro : 3,99 €/mois ·
-   29,99 €/an · **lifetime 49,99 €** mis en avant (« pas d'abonnement obligatoire parce que
-   pas de serveurs »). RevenueCat câblé : entitlement `picpic_pro`, offering `default`
-   (monthly/annual/lifetime), `ProStore` + `PaywallView`, bannière Pro + tuiles verrouillées.
-   Reste : **App Store Connect** (produits IAP, fiche FR, privacy nutrition labels : ISBN envoyé
-   à Google Books/Open Library/Sudoc) + remplacer la clé test RevenueCat par la clé `appl_…`
-   dans `ProStore.swift` + aligner les prix du Test Store (dashboard RC).
+1. **Monétisation** — ✅ complet de bout en bout : paywall Picpic Pro (3,99 €/mois ·
+   29,99 €/an · **lifetime 49,99 €** mis en avant), RevenueCat prod (`appl_…` en Release,
+   Test Store EUR en Debug, clé In-App Purchase uploadée), App Store Connect fait par API :
+   3 produits tarifés 175 territoires + captures review, fiche fr-FR complète (textes,
+   mots-clés, captures 6,9", catégories, âge 4+, URLs support/privacy), privacy labels cochés.
    Règle absolue : jamais de cap de livres ni de scan — le paywall porte sur la valeur ajoutée.
-2. **Scan d'étagère** — ✅ livré (31/08/2026) : OCR Vision 3 orientations (tranches verticales),
-   rapprochement Google Books avec garde-fou anti-faux positifs, sélection + ajout en lot,
-   verrouillé Pro. Screenshot ASO n°1 (« 200 livres en 10 min »)
-3. **Fiches de révision on-device** (gratuit : 3/mois) — ancre prix face à Blinkist, prudence juridique
-   (précédent Koober c. Eyrolles : ton neutre, pas de reproduction du texte)
-4. **Stats avancées + Rétrospective annuelle** (base gratuite partageable, custom premium) —
-   fenêtre virale BookTok en décembre
-5. **Widgets + Live Activity** de session de lecture
-6. **Import Goodreads/StoryGraph CSV** — toujours gratuit (canal d'acquisition n°1)
-7. Fiabiliser les métadonnées (« Auteur inconnu » sur certaines éditions : croiser GB + OL + Inventaire.io)
+2. **Scan d'étagère** — ✅ : OCR Vision 3 orientations, rapprochement Google Books
+   anti-faux positifs, sélection + ajout en lot, verrouillé Pro.
 
-Gratuit non négociable : scan illimité, livres illimités, import/export CSV, demi-étoiles.
+## V1.2 « App complète » — ✅ livrée (31/08/2026)
 
-## V1.2 « Le campus » — cible janvier 2027
+Décision : **aucune tuile « Bientôt » dans l'app soumise** — tout ce qui est affiché est livré.
+
+1. **Lire & écouter gratuit** (gratuit — domaine public jamais paywallé) :
+   EPUB via Gutendex puis Wikisource/ws-export, audio LibriVox streamé dans un lecteur
+   intégré (chapitres, ±15 s, enchaînement, audio en arrière-plan), section sur la fiche
+   livre + écran découverte (classiques populaires + matchs de la bibliothèque).
+   Sources et pièges : docs/CURATION-OPEN-DATA-LECTURE.md.
+2. **Ta rétrospective** (Pro) : stats on-device (livres, terminés, pages, note moyenne,
+   répartition statuts, ajouts par mois en Swift Charts, top auteurs/thèmes).
+3. Retrait des teasers (fiches de révision, widgets, streaks, citations, mode étudiant,
+   sync) de la grille et du paywall → backlog ci-dessous.
+
+## Backlog V1.3+ (rien n'est promis dans l'app)
+
+- Fiches de révision on-device (gratuit : 3/mois) — prudence juridique (Koober c. Eyrolles)
+- Widgets + Live Activity de session de lecture
+- Import Goodreads/StoryGraph CSV — toujours gratuit (canal d'acquisition n°1)
+- Objectifs/streaks, citations OCR + quote cards
+- Fiabiliser les métadonnées (croiser GB + OL + Inventaire.io)
+
+Gratuit non négociable : scan illimité, livres illimités, import/export CSV, lecture domaine public.
+
+## « Le campus » — cible janvier 2027
 
 - Mode étudiant complet : reco par filière, recherche Sudoc thématique
 - Objectifs/streaks + gel de série, citations OCR + quote cards

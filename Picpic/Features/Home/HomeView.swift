@@ -24,6 +24,8 @@ struct HomeView: View {
     @State private var showScanFirstHint = false
     @State private var showPaywall = false
     @State private var showShelfScan = false
+    @State private var showFreeLibrary = false
+    @State private var showStats = false
     @FocusState private var searchFocused: Bool
 
     private var displayedBooks: [Book] {
@@ -86,6 +88,12 @@ struct HomeView: View {
             .sheet(isPresented: $showShelfScan) {
                 ShelfScanView()
             }
+            .sheet(isPresented: $showFreeLibrary) {
+                FreeLibraryView()
+            }
+            .sheet(isPresented: $showStats) {
+                StatsView()
+            }
             .sheet(isPresented: $viewModel.showRateModal) {
                 RateAppModal()
                     .presentationDetents([.height(440)])
@@ -113,6 +121,8 @@ struct HomeView: View {
                 switch ProcessInfo.processInfo.arguments[index + 1] {
                 case "paywall": showPaywall = true
                 case "shelfscan": showShelfScan = true
+                case "freereading": showFreeLibrary = true
+                case "stats": showStats = true
                 default: break
                 }
             }
@@ -264,9 +274,8 @@ struct HomeView: View {
         }
     }
 
-    /// Real destinations for the features already shipped; nil falls back
-    /// to the "Bientôt" alert inside the tile.
-    private func action(for feature: PremiumFeature) -> (() -> Void)? {
+    /// Every tile leads to a real, shipped feature (no teasers).
+    private func action(for feature: PremiumFeature) -> () -> Void {
         switch feature.id {
         case "shelfscan":
             return {
@@ -278,6 +287,8 @@ struct HomeView: View {
             }
         case "semantic":
             return { searchFocused = true }
+        case "freereading":
+            return { showFreeLibrary = true }
         case "availability":
             return {
                 if let latest = books.first {
@@ -286,8 +297,16 @@ struct HomeView: View {
                     showScanFirstHint = true
                 }
             }
+        case "stats":
+            return {
+                if proStore.isPro {
+                    showStats = true
+                } else {
+                    showPaywall = true
+                }
+            }
         default:
-            return nil
+            return {}
         }
     }
 
@@ -368,31 +387,17 @@ struct BookCard: View {
 struct FeatureTile: View {
     let feature: PremiumFeature
     var isLocked = false
-    var action: (() -> Void)?
-    @State private var showComingSoon = false
+    let action: () -> Void
 
     var body: some View {
-        Button {
-            if let action {
-                action()
-            } else {
-                showComingSoon = true
-            }
-        } label: {
+        Button(action: action) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: feature.symbol)
                         .font(.title3)
                         .foregroundStyle(feature.tint)
                     Spacer()
-                    if !feature.isAvailable {
-                        Text("Bientôt")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(feature.tint.opacity(0.15), in: Capsule())
-                            .foregroundStyle(feature.tint)
-                    } else if isLocked {
+                    if isLocked {
                         Label("Pro", systemImage: "lock.fill")
                             .font(.caption2.weight(.bold))
                             .padding(.horizontal, 8)
@@ -417,10 +422,5 @@ struct FeatureTile: View {
             .shadow(color: Theme.ink.opacity(0.05), radius: 8, y: 3)
         }
         .buttonStyle(PressableStyle())
-        .alert("Bientôt disponible ✨", isPresented: $showComingSoon) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("« \(feature.title) » arrive dans une prochaine mise à jour.")
-        }
     }
 }

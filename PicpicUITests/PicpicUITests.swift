@@ -15,7 +15,8 @@ final class PicpicUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launchApp(onboardingDone: Bool, resetBooks: Bool = false, pro: Bool = false) -> XCUIApplication {
+    private func launchApp(onboardingDone: Bool, resetBooks: Bool = false, pro: Bool = false,
+                           freeReadingStub: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-onboarding.done", onboardingDone ? "YES" : "NO"]
         app.launchArguments += ["-stats.scanCount", "0"]
@@ -24,6 +25,9 @@ final class PicpicUITests: XCTestCase {
         }
         if pro {
             app.launchArguments += ["-uitest-pro"]
+        }
+        if freeReadingStub {
+            app.launchArguments += ["-uitest-freereading-stub"]
         }
         app.launch()
         return app
@@ -82,19 +86,12 @@ final class PicpicUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Scanne ton premier livre"].exists, "État vide absent")
 
-        // Grille des features premium (les 4 premières tuiles visibles sans scroll profond)
+        // Grille des features : uniquement des features livrées, aucun « Bientôt »
         app.swipeUp()
         XCTAssertTrue(app.staticTexts["Aller plus loin"].waitForExistence(timeout: 3), "Section grille premium absente")
         XCTAssertTrue(app.staticTexts["Dispo autour de moi"].exists, "Tuile disponibilité absente")
-
-        // Une tuile "Bientôt" affiche le modal coming soon
-        app.swipeUp()
-        let statsTile = app.buttons.containing(.staticText, identifier: "Stats & Rétrospective").firstMatch
-        if statsTile.exists {
-            statsTile.tap()
-            XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 3), "Alerte Bientôt absente")
-            app.alerts.buttons["OK"].tap()
-        }
+        XCTAssertTrue(app.staticTexts["Lire & écouter gratuit"].exists, "Tuile lecture gratuite absente")
+        XCTAssertFalse(app.staticTexts["Bientôt"].exists, "Aucune tuile ne doit afficher « Bientôt »")
     }
 
     // MARK: - Feature 4 : Scanner (sheet + saisie manuelle)
@@ -141,7 +138,12 @@ final class PicpicUITests: XCTestCase {
 
         let searchField = app.textFields.firstMatch
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
-        searchField.tap()
+        // Le focus clavier peut rater au premier tap sur simulateur : on insiste.
+        var attempts = 0
+        repeat {
+            searchField.tap()
+            attempts += 1
+        } while !app.keyboards.firstMatch.waitForExistence(timeout: 2) && attempts < 3
         searchField.typeText("roman sur la mer")
         // Pas de crash + le champ contient bien la requête
         XCTAssertTrue((searchField.value as? String)?.contains("mer") == true)
@@ -205,6 +207,66 @@ final class PicpicUITests: XCTestCase {
                       "La feature scan d'étagère doit s'ouvrir pour un compte Pro")
         XCTAssertTrue(app.buttons["shelfscan.pickPhoto"].waitForExistence(timeout: 3),
                       "Le choix de photo doit être proposé")
+        app.buttons["Fermer"].tap()
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 3))
+    }
+
+    // MARK: - Feature 10 : Lire & écouter gratuit (hors ligne via stub)
+
+    @MainActor
+    func testFreeLibraryOpensWithClassics() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true, freeReadingStub: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        let tile = app.buttons.containing(.staticText, identifier: "Lire & écouter gratuit").firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 3), "Tuile lecture gratuite absente")
+        tile.tap()
+
+        XCTAssertTrue(app.navigationBars["Lire & écouter gratuit"].waitForExistence(timeout: 4),
+                      "L'écran lecture gratuite doit s'ouvrir")
+        XCTAssertTrue(app.staticTexts["Classiques à découvrir"].waitForExistence(timeout: 4),
+                      "La section découverte doit s'afficher")
+        XCTAssertTrue(app.staticTexts["Les Fleurs du mal"].waitForExistence(timeout: 4),
+                      "Les classiques (stub) doivent se charger")
+        app.buttons["Fermer"].tap()
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 3))
+    }
+
+    // MARK: - Feature 11 : Rétrospective verrouillée pour un compte gratuit
+
+    @MainActor
+    func testStatsLockedShowsPaywall() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        app.swipeUp()
+        let statsTile = app.buttons.containing(.staticText, identifier: "Ta rétrospective").firstMatch
+        XCTAssertTrue(statsTile.waitForExistence(timeout: 3), "Tuile rétrospective absente")
+        statsTile.tap()
+
+        XCTAssertTrue(app.staticTexts["Picpic Pro"].waitForExistence(timeout: 4),
+                      "La rétrospective verrouillée doit ouvrir le paywall")
+    }
+
+    // MARK: - Feature 12 : Rétrospective accessible en Pro
+
+    @MainActor
+    func testProUserOpensStats() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true, pro: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        app.swipeUp()
+        let statsTile = app.buttons.containing(.staticText, identifier: "Ta rétrospective").firstMatch
+        XCTAssertTrue(statsTile.waitForExistence(timeout: 3), "Tuile rétrospective absente")
+        statsTile.tap()
+
+        XCTAssertTrue(app.navigationBars["Ta rétrospective"].waitForExistence(timeout: 4),
+                      "La rétrospective doit s'ouvrir pour un compte Pro")
+        XCTAssertTrue(app.staticTexts["Scanne tes premiers livres"].waitForExistence(timeout: 3),
+                      "L'état vide de la rétrospective doit s'afficher sans livres")
         app.buttons["Fermer"].tap()
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 3))
     }

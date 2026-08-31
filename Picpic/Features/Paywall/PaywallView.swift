@@ -88,15 +88,12 @@ struct PaywallView: View {
             featureRow(symbol: "camera.metering.matrix", tint: Theme.accent,
                        title: "Scan d'étagère",
                        detail: "Toute une étagère cataloguée en une photo.")
-            featureRow(symbol: "text.badge.checkmark", tint: Theme.lavender,
-                       title: "Fiches de révision illimitées",
-                       detail: "3 par mois offertes à tout le monde. (bientôt)")
             featureRow(symbol: "chart.bar.fill", tint: .purple,
-                       title: "Rétrospective personnalisée",
-                       detail: "Ton année lecture façon Wrapped, à ta sauce. (bientôt)")
-            featureRow(symbol: "apps.iphone", tint: .pink,
-                       title: "Widgets & Live Activity",
-                       detail: "Ta lecture en cours sur l'écran d'accueil. (bientôt)")
+                       title: "Ta rétrospective lecture",
+                       detail: "Ton année en chiffres, calculée sur ton iPhone.")
+            featureRow(symbol: "heart.fill", tint: .pink,
+                       title: "Tu soutiens un projet indépendant",
+                       detail: "Sans pub, sans serveurs, sans revente de données.")
             Text("Tout ce qui sortira en Pro est inclus, sans payer plus.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
