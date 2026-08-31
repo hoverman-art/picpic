@@ -32,6 +32,9 @@ struct BookDetailView: View {
                 if let description = book.bookDescription, !description.isEmpty {
                     summarySection(description)
                 }
+                FreeReadingSection(book: book) { url in
+                    safariLink = SafariLink(url: url)
+                }
                 availabilitySection
                 if !book.subjects.isEmpty {
                     subjectsSection
