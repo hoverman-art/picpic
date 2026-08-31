@@ -15,12 +15,15 @@ final class PicpicUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launchApp(onboardingDone: Bool, resetBooks: Bool = false) -> XCUIApplication {
+    private func launchApp(onboardingDone: Bool, resetBooks: Bool = false, pro: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-onboarding.done", onboardingDone ? "YES" : "NO"]
         app.launchArguments += ["-stats.scanCount", "0"]
         if resetBooks {
             app.launchArguments += ["-uitest-reset-books"]
+        }
+        if pro {
+            app.launchArguments += ["-uitest-pro"]
         }
         app.launch()
         return app
@@ -142,5 +145,67 @@ final class PicpicUITests: XCTestCase {
         searchField.typeText("roman sur la mer")
         // Pas de crash + le champ contient bien la requête
         XCTAssertTrue((searchField.value as? String)?.contains("mer") == true)
+    }
+
+    // MARK: - Feature 7 : Paywall depuis la bannière Pro
+
+    @MainActor
+    func testPaywallOpensFromProBanner() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        let banner = app.buttons["home.proBanner"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 3), "Bannière Picpic Pro absente pour un compte gratuit")
+        banner.tap()
+
+        // Le paywall affiche les trois formules, lifetime comprise
+        XCTAssertTrue(app.staticTexts["Picpic Pro"].waitForExistence(timeout: 4), "Titre du paywall absent")
+        XCTAssertTrue(app.buttons["paywall.plan.lifetime"].waitForExistence(timeout: 3), "Formule à vie absente")
+        XCTAssertTrue(app.buttons["paywall.plan.annual"].exists, "Formule annuelle absente")
+        XCTAssertTrue(app.buttons["paywall.plan.monthly"].exists, "Formule mensuelle absente")
+        XCTAssertTrue(app.buttons["paywall.cta"].exists, "CTA d'achat absent")
+        XCTAssertTrue(app.buttons["paywall.restore"].exists, "Bouton restaurer absent")
+
+        app.buttons["paywall.close"].tap()
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 3))
+    }
+
+    // MARK: - Feature 8 : Scan d'étagère verrouillé pour un compte gratuit
+
+    @MainActor
+    func testShelfScanLockedShowsPaywall() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        let shelfTile = app.buttons.containing(.staticText, identifier: "Scan d'étagère").firstMatch
+        XCTAssertTrue(shelfTile.waitForExistence(timeout: 3), "Tuile scan d'étagère absente")
+        shelfTile.tap()
+
+        XCTAssertTrue(app.staticTexts["Picpic Pro"].waitForExistence(timeout: 4),
+                      "La tuile verrouillée doit ouvrir le paywall")
+    }
+
+    // MARK: - Feature 9 : Scan d'étagère accessible en Pro
+
+    @MainActor
+    func testProUserOpensShelfScan() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true, pro: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home.proBanner"].exists, "La bannière Pro ne doit pas s'afficher en Pro")
+
+        app.swipeUp()
+        let shelfTile = app.buttons.containing(.staticText, identifier: "Scan d'étagère").firstMatch
+        XCTAssertTrue(shelfTile.waitForExistence(timeout: 3), "Tuile scan d'étagère absente")
+        shelfTile.tap()
+
+        XCTAssertTrue(app.navigationBars["Scan d'étagère"].waitForExistence(timeout: 4),
+                      "La feature scan d'étagère doit s'ouvrir pour un compte Pro")
+        XCTAssertTrue(app.buttons["shelfscan.pickPhoto"].waitForExistence(timeout: 3),
+                      "Le choix de photo doit être proposé")
+        app.buttons["Fermer"].tap()
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 3))
     }
 }

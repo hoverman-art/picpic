@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EEC0FFEE0000000000000003 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = EEC0FFEE0000000000000002 /* RevenueCat */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		EE2BB3563045747900A15899 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EEC0FFEE0000000000000003 /* RevenueCat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = Picpic;
 			packageProductDependencies = (
+				EEC0FFEE0000000000000002 /* RevenueCat */,
 			);
 			productName = Picpic;
 			productReference = EE2BB3483045747600A15899 /* Picpic.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = EE2BB33F3045747600A15899;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EEC0FFEE0000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EE2BB3493045747600A15899 /* Products */;
 			projectDirPath = "";
@@ -206,6 +215,25 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EEC0FFEE0000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EEC0FFEE0000000000000002 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EEC0FFEE0000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
 		EE2BB3463045747600A15899 /* Resources */ = {
@@ -400,7 +428,7 @@
 				DEVELOPMENT_TEAM = M32S87PW86;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Picpic utilise l'appareil photo uniquement pour scanner les codes-barres des livres.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Picpic utilise l'appareil photo uniquement pour scanner les codes-barres et photographier tes \U00e9tag\U00e8res de livres.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -433,7 +461,7 @@
 				DEVELOPMENT_TEAM = M32S87PW86;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Picpic utilise l'appareil photo uniquement pour scanner les codes-barres des livres.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Picpic utilise l'appareil photo uniquement pour scanner les codes-barres et photographier tes \U00e9tag\U00e8res de livres.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

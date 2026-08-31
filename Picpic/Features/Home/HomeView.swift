@@ -12,6 +12,7 @@ import SwiftData
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(UserSettings.self) private var settings
+    @Environment(ProStore.self) private var proStore
     @Query(sort: \Book.dateAdded, order: .reverse) private var books: [Book]
 
     @State private var viewModel = LibraryViewModel()
@@ -21,6 +22,8 @@ struct HomeView: View {
     @State private var appeared = false
     @State private var navPath = NavigationPath()
     @State private var showScanFirstHint = false
+    @State private var showPaywall = false
+    @State private var showShelfScan = false
     @FocusState private var searchFocused: Bool
 
     private var displayedBooks: [Book] {
@@ -46,8 +49,13 @@ struct HomeView: View {
                             .staggeredAppear(index: 2, isVisible: appeared)
                     }
 
+                    if !proStore.isPro {
+                        proBanner
+                            .staggeredAppear(index: 3, isVisible: appeared)
+                    }
+
                     featureGrid
-                        .staggeredAppear(index: 3, isVisible: appeared)
+                        .staggeredAppear(index: 4, isVisible: appeared)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 100)
@@ -71,6 +79,12 @@ struct HomeView: View {
             }
             .fullScreenCover(isPresented: $showTutorial) {
                 TutorialView()
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+            }
+            .sheet(isPresented: $showShelfScan) {
+                ShelfScanView()
             }
             .sheet(isPresented: $viewModel.showRateModal) {
                 RateAppModal()
@@ -189,6 +203,35 @@ struct HomeView: View {
         }
     }
 
+    private var proBanner: some View {
+        Button {
+            showPaywall = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(Theme.gold)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Picpic Pro")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text("Scan d'étagère et plus — dès 29,99 €/an, ou 49,99 € à vie.")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .padding(16)
+            .background(Theme.ink, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityIdentifier("home.proBanner")
+    }
+
     private var featureGrid: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Aller plus loin")
@@ -196,7 +239,9 @@ struct HomeView: View {
                 .foregroundStyle(Theme.ink)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
                 ForEach(PremiumFeature.all) { feature in
-                    FeatureTile(feature: feature, action: action(for: feature))
+                    FeatureTile(feature: feature,
+                                isLocked: feature.requiresPro && !proStore.isPro,
+                                action: action(for: feature))
                 }
             }
         }
@@ -212,6 +257,14 @@ struct HomeView: View {
     /// to the "Bientôt" alert inside the tile.
     private func action(for feature: PremiumFeature) -> (() -> Void)? {
         switch feature.id {
+        case "shelfscan":
+            return {
+                if proStore.isPro {
+                    showShelfScan = true
+                } else {
+                    showPaywall = true
+                }
+            }
         case "semantic":
             return { searchFocused = true }
         case "availability":
@@ -303,6 +356,7 @@ struct BookCard: View {
 
 struct FeatureTile: View {
     let feature: PremiumFeature
+    var isLocked = false
     var action: (() -> Void)?
     @State private var showComingSoon = false
 
@@ -327,6 +381,13 @@ struct FeatureTile: View {
                             .padding(.vertical, 4)
                             .background(feature.tint.opacity(0.15), in: Capsule())
                             .foregroundStyle(feature.tint)
+                    } else if isLocked {
+                        Label("Pro", systemImage: "lock.fill")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Theme.gold.opacity(0.18), in: Capsule())
+                            .foregroundStyle(Theme.gold)
                     }
                 }
                 Spacer(minLength: 0)
