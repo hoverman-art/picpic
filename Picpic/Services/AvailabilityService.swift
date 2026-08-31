@@ -37,6 +37,8 @@ struct AvailabilitySource: Identifiable {
 
 /// A university library holding the book, from Sudoc multiwhere.
 struct HoldingLibrary: Identifiable {
+    private static let laRochelle = CLLocation(latitude: 46.1603, longitude: -1.1511)
+
     let id: String // RCR
     let name: String
     let coordinate: CLLocationCoordinate2D?
@@ -44,9 +46,8 @@ struct HoldingLibrary: Identifiable {
     /// Distance in km from La Rochelle city centre, if locatable.
     var distanceFromLaRochelle: Double? {
         guard let coordinate else { return nil }
-        let laRochelle = CLLocation(latitude: 46.1603, longitude: -1.1511)
         let here = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        return here.distance(from: laRochelle) / 1000
+        return here.distance(from: Self.laRochelle) / 1000
     }
 }
 
@@ -58,7 +59,6 @@ struct AvailabilityService {
     /// Catalogue deep links, always offered for a given ISBN/title.
     /// Opened in Safari — these portals have no public API.
     func catalogueLinks(isbn: String, title: String) -> [AvailabilitySource] {
-        let encodedTitle = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? isbn
         var sources: [AvailabilitySource] = []
 
         if let url = URL(string: "https://larochelle.primo.exlibrisgroup.com/discovery/search?query=any,contains,\(isbn)&vid=33ULR_INST:NDE") {
@@ -85,7 +85,11 @@ struct AvailabilityService {
                 url: url
             ))
         }
-        if let url = URL(string: "https://www.gutenberg.org/ebooks/search/?query=\(encodedTitle)") {
+        // URLComponents applies value-appropriate percent-encoding
+        // (titles with & or + would otherwise corrupt the query).
+        var gutenberg = URLComponents(string: "https://www.gutenberg.org/ebooks/search/")
+        gutenberg?.queryItems = [URLQueryItem(name: "query", value: title)]
+        if let url = gutenberg?.url {
             sources.append(AvailabilitySource(
                 kind: .freeEbook,
                 name: "Ebook gratuit",
@@ -158,10 +162,13 @@ struct AvailabilityService {
             }
         }
         // Deduplicate by RCR, nearest to La Rochelle first.
+        // Decorate-sort-undecorate: one distance computation per library.
         var seen = Set<String>()
         return libraries
             .filter { seen.insert($0.id).inserted }
-            .sorted { ($0.distanceFromLaRochelle ?? .infinity) < ($1.distanceFromLaRochelle ?? .infinity) }
+            .map { ($0, $0.distanceFromLaRochelle ?? .infinity) }
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
     }
 
     /// Sudoc notice URL for a resolved PPN.

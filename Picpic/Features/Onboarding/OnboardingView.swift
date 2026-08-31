@@ -205,7 +205,7 @@ struct OnboardingView: View {
             MascotView(pose: .flying, height: 160)
                 .staggeredAppear(index: 0, isVisible: pageVisible)
             AnimatedText(text: "Prêt·e à scanner ton premier livre ?", isVisible: pageVisible, font: .display(30))
-            Text("Picpic utilise l'appareil photo uniquement pour lire les codes-barres. Tes données restent sur ton iPhone — zéro compte, zéro serveur.")
+            Text("Picpic utilise l'appareil photo uniquement pour lire les codes-barres. Pas de compte, pas de tracking : ta bibliothèque reste sur ton iPhone, et seul l'ISBN est envoyé aux catalogues ouverts (Google Books, Open Library, Sudoc) pour retrouver le livre.")
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.75))
                 .staggeredAppear(index: 4, isVisible: pageVisible)

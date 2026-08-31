@@ -92,7 +92,7 @@ struct BookMetadataService {
         let subjects: [String]?
     }
 
-    private struct OLAuthor: Decodable { let name: String? }
+    private nonisolated struct OLAuthor: Decodable { let name: String? }
 
     private func fetchFromOpenLibrary(isbn: String) async throws -> BookMetadata {
         let url = URL(string: "https://openlibrary.org/isbn/\(isbn).json")!
@@ -116,14 +116,25 @@ struct BookMetadataService {
             }
         }
 
-        var authorNames: [String] = []
-        for author in edition.authors ?? [] {
-            guard let key = author.key,
-                  let authorURL = URL(string: "https://openlibrary.org\(key).json"),
-                  let (authorData, _) = try? await session.data(from: authorURL),
-                  let decoded = try? JSONDecoder().decode(OLAuthor.self, from: authorData),
-                  let name = decoded.name else { continue }
-            authorNames.append(name)
+        // Author records resolve concurrently (latency = slowest request,
+        // not the sum), order preserved via the original index.
+        let authorKeys = (edition.authors ?? []).compactMap(\.key)
+        let session = self.session
+        var authorNames: [String] = await withTaskGroup(of: (Int, String?).self) { group in
+            for (index, key) in authorKeys.enumerated() {
+                guard let authorURL = URL(string: "https://openlibrary.org\(key).json") else { continue }
+                group.addTask {
+                    let name = (try? await session.data(from: authorURL).0)
+                        .flatMap { try? JSONDecoder().decode(OLAuthor.self, from: $0) }?
+                        .name
+                    return (index, name)
+                }
+            }
+            var pairs: [(Int, String)] = []
+            for await (index, name) in group {
+                if let name { pairs.append((index, name)) }
+            }
+            return pairs.sorted { $0.0 < $1.0 }.map(\.1)
         }
         if authorNames.isEmpty, let by = edition.by_statement {
             authorNames = [by]

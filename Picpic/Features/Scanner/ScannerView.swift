@@ -16,10 +16,23 @@ struct ScannerView: View {
     let onISBN: (String) -> Void
 
     @State private var manualISBN = ""
-    @State private var torchHint = false
+    @State private var rejectedCode = false
 
     private var scannerAvailable: Bool {
         DataScannerViewController.isSupported && DataScannerViewController.isAvailable
+    }
+
+    private var manualISBNIsValid: Bool {
+        Self.validISBN(manualISBN) != nil
+    }
+
+    /// Returns the cleaned digits when the input is a plausible book ISBN
+    /// (10 digits, or 13 digits prefixed 978/979), nil otherwise.
+    static func validISBN(_ raw: String) -> String? {
+        let digits = raw.filter(\.isNumber)
+        guard digits.count == 13 || digits.count == 10 else { return nil }
+        if digits.count == 13, !digits.hasPrefix("978"), !digits.hasPrefix("979") { return nil }
+        return digits
     }
 
     var body: some View {
@@ -58,7 +71,9 @@ struct ScannerView: View {
                 .strokeBorder(.white.opacity(0.9), lineWidth: 3)
                 .frame(width: 260, height: 150)
                 .overlay(alignment: .top) {
-                    Text("Vise le code-barres au dos du livre")
+                    Text(rejectedCode
+                         ? "Ce n'est pas un livre — vise le code ISBN (978…)"
+                         : "Vise le code-barres au dos du livre")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(.white)
                         .padding(8)
@@ -80,36 +95,49 @@ struct ScannerView: View {
     }
 
     private var manualEntry: some View {
-        HStack(spacing: 10) {
-            TextField("ISBN (ex. 9782070368228)", text: $manualISBN)
-                .keyboardType(.numberPad)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier("isbnField")
-            Button {
-                handle(manualISBN)
-            } label: {
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.title2)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                TextField("ISBN (ex. 9782070368228)", text: $manualISBN)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("isbnField")
+                Button {
+                    handle(manualISBN)
+                } label: {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.title2)
+                }
+                .accessibilityLabel("Valider l'ISBN")
+                .disabled(!manualISBNIsValid)
             }
-            .accessibilityLabel("Valider l'ISBN")
-            .disabled(manualISBN.filter(\.isNumber).count < 10)
+            if !manualISBN.isEmpty && !manualISBNIsValid {
+                Text("Un ISBN fait 10 chiffres, ou 13 en commençant par 978/979.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
-    private func handle(_ raw: String) {
-        let digits = raw.filter(\.isNumber)
-        guard digits.count == 13 || digits.count == 10 else { return }
-        // Books only: EAN-13 for books starts with 978/979.
-        if digits.count == 13, !digits.hasPrefix("978"), !digits.hasPrefix("979") { return }
+    /// Returns true when the code was accepted (book ISBN), so the
+    /// scanner coordinator only latches after a real success.
+    @discardableResult
+    private func handle(_ raw: String) -> Bool {
+        guard let digits = Self.validISBN(raw) else {
+            rejectedCode = true
+            return false
+        }
         onISBN(digits)
         dismiss()
+        return true
     }
 }
 
 // MARK: - VisionKit wrapper
 
 private struct BarcodeScannerRepresentable: UIViewControllerRepresentable {
-    let onCode: (String) -> Void
+    /// Returns true when the payload was accepted; the coordinator keeps
+    /// scanning until then.
+    let onCode: (String) -> Bool
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         let scanner = DataScannerViewController(
@@ -128,10 +156,10 @@ private struct BarcodeScannerRepresentable: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onCode: onCode) }
 
     final class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        let onCode: (String) -> Void
+        let onCode: (String) -> Bool
         private var didFire = false
 
-        init(onCode: @escaping (String) -> Void) {
+        init(onCode: @escaping (String) -> Bool) {
             self.onCode = onCode
         }
 
@@ -139,9 +167,12 @@ private struct BarcodeScannerRepresentable: UIViewControllerRepresentable {
             guard !didFire else { return }
             for item in addedItems {
                 if case .barcode(let barcode) = item, let payload = barcode.payloadStringValue {
-                    didFire = true
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    onCode(payload)
+                    if onCode(payload) {
+                        didFire = true
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    } else {
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    }
                     return
                 }
             }

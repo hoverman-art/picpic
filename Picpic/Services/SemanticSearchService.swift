@@ -15,9 +15,12 @@ struct SemanticSearchService {
 
     static let shared = SemanticSearchService()
 
-    private var embedding: NLEmbedding? {
+    // NLEmbedding models are expensive to create and safe to reuse:
+    // load once for the process lifetime.
+    private static let cachedEmbedding: NLEmbedding? =
         NLEmbedding.sentenceEmbedding(for: .french) ?? NLEmbedding.sentenceEmbedding(for: .english)
-    }
+
+    private var embedding: NLEmbedding? { Self.cachedEmbedding }
 
     /// Computes the embedding vector for a text, encoded as Float32 Data.
     func vector(for text: String) -> Data? {

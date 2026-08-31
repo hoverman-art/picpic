@@ -49,7 +49,7 @@ final class LibraryViewModel {
             )
             book.embedding = SemanticSearchService.shared.vector(for: book.semanticText)
             context.insert(book)
-            try? context.save()
+            try context.save()
 
             lastScannedBook = book
             settings.scanCount += 1

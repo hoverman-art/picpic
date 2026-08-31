@@ -19,6 +19,9 @@ struct HomeView: View {
     @State private var showScanner = false
     @State private var showTutorial = false
     @State private var appeared = false
+    @State private var navPath = NavigationPath()
+    @State private var showScanFirstHint = false
+    @FocusState private var searchFocused: Bool
 
     private var displayedBooks: [Book] {
         searchText.isEmpty
@@ -27,7 +30,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navPath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     header
@@ -133,6 +136,7 @@ struct HomeView: View {
                 .foregroundStyle(Theme.accent)
             TextField("Cherche par idée : « roman sur la mer »…", text: $searchText)
                 .autocorrectionDisabled()
+                .focused($searchFocused)
         }
         .padding(14)
         .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -192,9 +196,34 @@ struct HomeView: View {
                 .foregroundStyle(Theme.ink)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
                 ForEach(PremiumFeature.all) { feature in
-                    FeatureTile(feature: feature)
+                    FeatureTile(feature: feature, action: action(for: feature))
                 }
             }
+        }
+        .alert("Scanne d'abord un livre 📚", isPresented: $showScanFirstHint) {
+            Button("Scanner", role: .none) { showScanner = true }
+            Button("Plus tard", role: .cancel) {}
+        } message: {
+            Text("La disponibilité s'affiche sur la fiche de chaque livre scanné.")
+        }
+    }
+
+    /// Real destinations for the features already shipped; nil falls back
+    /// to the "Bientôt" alert inside the tile.
+    private func action(for feature: PremiumFeature) -> (() -> Void)? {
+        switch feature.id {
+        case "semantic":
+            return { searchFocused = true }
+        case "availability":
+            return {
+                if let latest = books.first {
+                    navPath.append(latest)
+                } else {
+                    showScanFirstHint = true
+                }
+            }
+        default:
+            return nil
         }
     }
 
@@ -274,11 +303,16 @@ struct BookCard: View {
 
 struct FeatureTile: View {
     let feature: PremiumFeature
+    var action: (() -> Void)?
     @State private var showComingSoon = false
 
     var body: some View {
         Button {
-            if !feature.isAvailable { showComingSoon = true }
+            if let action {
+                action()
+            } else {
+                showComingSoon = true
+            }
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {

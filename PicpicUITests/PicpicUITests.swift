@@ -15,10 +15,13 @@ final class PicpicUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launchApp(onboardingDone: Bool) -> XCUIApplication {
+    private func launchApp(onboardingDone: Bool, resetBooks: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-onboarding.done", onboardingDone ? "YES" : "NO"]
         app.launchArguments += ["-stats.scanCount", "0"]
+        if resetBooks {
+            app.launchArguments += ["-uitest-reset-books"]
+        }
         app.launch()
         return app
     }
@@ -71,7 +74,7 @@ final class PicpicUITests: XCTestCase {
 
     @MainActor
     func testHomeEmptyStateAndFeatureGrid() throws {
-        let app = launchApp(onboardingDone: true)
+        let app = launchApp(onboardingDone: true, resetBooks: true)
 
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Scanne ton premier livre"].exists, "État vide absent")
@@ -113,7 +116,7 @@ final class PicpicUITests: XCTestCase {
 
     @MainActor
     func testManualScanAddsBookAndOpensDetail() throws {
-        let app = launchApp(onboardingDone: true)
+        let app = launchApp(onboardingDone: true, resetBooks: true)
 
         app.buttons["Scanner"].tap()
         let isbnField = app.textFields["isbnField"]

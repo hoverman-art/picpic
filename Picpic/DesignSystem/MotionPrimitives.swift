@@ -72,11 +72,14 @@ struct WrappingHStack: Layout {
     var lineSpacing: CGFloat = 6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0
+        // Never report an infinite size: with an unspecified proposal,
+        // the ideal size is the single-line content width.
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, usedWidth: CGFloat = 0
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > width, x > 0 {
+            if x + size.width > maxWidth, x > 0 {
+                usedWidth = max(usedWidth, x - spacing)
                 x = 0
                 y += lineHeight + lineSpacing
                 lineHeight = 0
@@ -84,7 +87,8 @@ struct WrappingHStack: Layout {
             x += size.width + spacing
             lineHeight = max(lineHeight, size.height)
         }
-        return CGSize(width: width, height: y + lineHeight)
+        usedWidth = max(usedWidth, x - spacing)
+        return CGSize(width: max(usedWidth, 0), height: y + lineHeight)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {

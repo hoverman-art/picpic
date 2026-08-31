@@ -9,12 +9,20 @@
 import SwiftUI
 import SafariServices
 
+/// Identifiable wrapper for `.sheet(item:)` — avoids a retroactive
+/// `URL: Identifiable` conformance that would collide if Foundation
+/// or a dependency ever declares one.
+private struct SafariLink: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
 struct BookDetailView: View {
     @Bindable var book: Book
 
     @State private var holdings: [HoldingLibrary] = []
     @State private var holdingsLoaded = false
-    @State private var safariURL: URL?
+    @State private var safariLink: SafariLink?
 
     var body: some View {
         ScrollView {
@@ -35,8 +43,8 @@ struct BookDetailView: View {
         .navigationTitle(book.title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadHoldings() }
-        .sheet(item: $safariURL) { url in
-            SafariView(url: url)
+        .sheet(item: $safariLink) { link in
+            SafariView(url: link.url)
                 .ignoresSafeArea()
         }
     }
@@ -121,7 +129,7 @@ struct BookDetailView: View {
 
             ForEach(AvailabilityService.shared.catalogueLinks(isbn: book.isbn, title: book.title)) { source in
                 Button {
-                    safariURL = source.url
+                    safariLink = SafariLink(url: source.url)
                 } label: {
                     HStack(spacing: 14) {
                         Image(systemName: source.symbol)
@@ -213,10 +221,6 @@ struct BookDetailView: View {
 }
 
 // MARK: - Safari helpers
-
-extension URL: @retroactive Identifiable {
-    public var id: String { absoluteString }
-}
 
 struct SafariView: UIViewControllerRepresentable {
     let url: URL
