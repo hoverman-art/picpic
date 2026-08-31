@@ -2,23 +2,26 @@
 //  ContentView.swift
 //  Picpic
 //
-//  Created by PEELY on 31/08/2026.
-//
 
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
+    @Environment(UserSettings.self) private var settings
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        if settings.hasCompletedOnboarding {
+            HomeView()
+                .transition(.opacity.combined(with: .scale(scale: 1.03)))
+        } else {
+            OnboardingView()
+                .transition(.opacity)
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .environment(UserSettings.shared)
+        .modelContainer(for: Book.self, inMemory: true)
 }
