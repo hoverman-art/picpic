@@ -17,13 +17,17 @@
 
 Priorités (ordre du ranking « features vendeuses ») :
 
-1. **Monétisation** — paywall Picpic Pro : 3,99 €/mois · 29,99 €/an · **lifetime 49,99 €** mis en avant
-   (« pas d'abonnement obligatoire parce que pas de serveurs »).
-   Implémentation : **RevenueCat** (offering, entitlement `pro`) + **App Store Connect**
-   (produits IAP, fiche FR, privacy nutrition labels : ISBN envoyé à Google Books/Open Library/Sudoc).
+1. **Monétisation** — ✅ côté app livré (31/08/2026) : paywall Picpic Pro : 3,99 €/mois ·
+   29,99 €/an · **lifetime 49,99 €** mis en avant (« pas d'abonnement obligatoire parce que
+   pas de serveurs »). RevenueCat câblé : entitlement `picpic_pro`, offering `default`
+   (monthly/annual/lifetime), `ProStore` + `PaywallView`, bannière Pro + tuiles verrouillées.
+   Reste : **App Store Connect** (produits IAP, fiche FR, privacy nutrition labels : ISBN envoyé
+   à Google Books/Open Library/Sudoc) + remplacer la clé test RevenueCat par la clé `appl_…`
+   dans `ProStore.swift` + aligner les prix du Test Store (dashboard RC).
    Règle absolue : jamais de cap de livres ni de scan — le paywall porte sur la valeur ajoutée.
-2. **Scan d'étagère** (Vision OCR multi-tranches) — feature phare du paywall, screenshot ASO n°1
-   (« 200 livres en 10 min »)
+2. **Scan d'étagère** — ✅ livré (31/08/2026) : OCR Vision 3 orientations (tranches verticales),
+   rapprochement Google Books avec garde-fou anti-faux positifs, sélection + ajout en lot,
+   verrouillé Pro. Screenshot ASO n°1 (« 200 livres en 10 min »)
 3. **Fiches de révision on-device** (gratuit : 3/mois) — ancre prix face à Blinkist, prudence juridique
    (précédent Koober c. Eyrolles : ton neutre, pas de reproduction du texte)
 4. **Stats avancées + Rétrospective annuelle** (base gratuite partageable, custom premium) —
@@ -54,4 +58,7 @@ Gratuit non négociable : scan illimité, livres illimités, import/export CSV, 
   deep-links uniquement (pas d'API).
 - Tests : `PicpicUITests` via XcodeBuildMCP `test_sim` avec
   `-parallel-testing-enabled NO` (le mode parallèle crée 3 clones de simulateur et se bloque).
-  Flag `-uitest-reset-books` pour partir d'une bibliothèque vide.
+  Flags : `-uitest-reset-books` (bibliothèque vide), `-uitest-pro` (force l'entitlement Pro
+  sans réseau).
+- RevenueCat : projet `projb6a47102`, entitlement `picpic_pro`, offering `default`,
+  clé publique Test Store dans `ProStore.swift`.

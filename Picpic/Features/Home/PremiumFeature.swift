@@ -16,11 +16,14 @@ struct PremiumFeature: Identifiable {
     let symbol: String
     let tint: Color
     var isAvailable: Bool = false
+    /// Feature verrouillée derrière l'entitlement `picpic_pro` une fois livrée.
+    var requiresPro: Bool = false
 
     static let all: [PremiumFeature] = [
         PremiumFeature(id: "shelfscan", title: "Scan d'étagère",
                        subtitle: "Toute une étagère en une photo",
-                       symbol: "camera.metering.matrix", tint: Theme.accent),
+                       symbol: "camera.metering.matrix", tint: Theme.accent,
+                       isAvailable: true, requiresPro: true),
         PremiumFeature(id: "semantic", title: "Recherche par idée",
                        subtitle: "« un roman sur la mer »",
                        symbol: "sparkle.magnifyingglass", tint: Theme.gold, isAvailable: true),
