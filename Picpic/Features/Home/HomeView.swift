@@ -105,7 +105,18 @@ struct HomeView: View {
                 Text(viewModel.fetchError ?? "")
             }
         }
-        .onAppear { appeared = true }
+        .onAppear {
+            appeared = true
+            // Ouverture directe d'un écran pour tests UI et captures d'écran.
+            if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "-uitest-open"),
+               index + 1 < ProcessInfo.processInfo.arguments.count {
+                switch ProcessInfo.processInfo.arguments[index + 1] {
+                case "paywall": showPaywall = true
+                case "shelfscan": showShelfScan = true
+                default: break
+                }
+            }
+        }
     }
 
     // MARK: - Sections
