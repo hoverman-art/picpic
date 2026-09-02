@@ -45,6 +45,7 @@ struct PaywallView: View {
                 ctaButton
                 restoreButton
                 freeReminder
+                legalFooter
             }
             .padding(20)
             .padding(.bottom, 16)
@@ -218,6 +219,28 @@ struct PaywallView: View {
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 8)
+    }
+
+    /// Exigence App Store 3.1.2 : conditions de renouvellement + liens
+    /// EULA et confidentialité visibles sur l'écran d'achat.
+    private var legalFooter: some View {
+        VStack(spacing: 8) {
+            Text("Les abonnements sont débités sur ton compte App Store et renouvelés automatiquement, sauf annulation au moins 24 h avant la fin de la période. Gérable à tout moment dans les réglages de ton compte.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 16) {
+                Link("Conditions d'utilisation",
+                     destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                Link("Confidentialité",
+                     destination: URL(string: "https://github.com/hoverman-art/picpic-support/blob/main/PRIVACY.md")!)
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Theme.teal)
+        }
+        .padding(.horizontal, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("paywall.legal")
     }
 
     private var closeButton: some View {

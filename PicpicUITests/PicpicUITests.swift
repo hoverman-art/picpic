@@ -168,6 +168,8 @@ final class PicpicUITests: XCTestCase {
         XCTAssertTrue(app.buttons["paywall.plan.monthly"].exists, "Formule mensuelle absente")
         XCTAssertTrue(app.buttons["paywall.cta"].exists, "CTA d'achat absent")
         XCTAssertTrue(app.buttons["paywall.restore"].exists, "Bouton restaurer absent")
+        // Guideline 3.1.2 : conditions de renouvellement + liens EULA/confidentialité.
+        XCTAssertTrue(app.otherElements["paywall.legal"].exists, "Pied légal absent du paywall")
 
         app.buttons["paywall.close"].tap()
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 3))
