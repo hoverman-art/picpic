@@ -12,11 +12,13 @@ import Foundation
 
 // MARK: - Modèles
 
-struct FreeEbook: Equatable {
+struct FreeEbook: Equatable, Identifiable {
     enum Source: String { case gutenberg = "Projet Gutenberg", wikisource = "Wikisource" }
     let source: Source
     let title: String
     let epubURL: URL
+
+    var id: String { epubURL.absoluteString }
 }
 
 struct FreeAudiobook: Equatable {
@@ -50,9 +52,33 @@ actor FreeReadingService {
 
     init() {
         let config = URLSessionConfiguration.default
-        // Gutendex et LibriVox peuvent mettre >15 s à froid (curation).
-        config.timeoutIntervalForRequest = 25
+        // 25 s était bien trop long : quand un endpoint ne répond plus (c'est
+        // arrivé à la recherche Gutendex), l'écran tourne dans le vide et,
+        // pire, les requêtes bloquées saturent la file vers le même hôte et
+        // font expirer celles qui, elles, marchent.
+        config.timeoutIntervalForRequest = 10
+        config.timeoutIntervalForResource = 20
+        config.httpMaximumConnectionsPerHost = 6
+        config.waitsForConnectivity = false
         session = URLSession(configuration: config)
+    }
+
+    /// Budget de temps propre à un appel, plus court que celui de la session :
+    /// un catalogue lent ne doit pas retenir tout l'écran.
+    private func withBudget<T: Sendable>(
+        _ seconds: Double,
+        operation: @escaping @Sendable () async -> T?
+    ) async -> T? {
+        await withTaskGroup(of: T?.self) { group in
+            group.addTask { await operation() }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(seconds))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
     }
 
     func match(isbn: String, title: String, authors: [String]) async -> FreeReadingMatch {
@@ -95,8 +121,15 @@ actor FreeReadingService {
             URLQueryItem(name: "search", value: query),
             URLQueryItem(name: "languages", value: "fr"),
         ]
-        guard let url = components.url,
-              let decoded: GutendexResponse = await get(url) else { return nil }
+        guard let url = components.url else { return nil }
+        // `?search=` de Gutendex est régulièrement indisponible alors que le
+        // reste du service répond : on lui donne 6 s, pas une de plus, et
+        // Wikisource prend le relais.
+        guard let decoded: GutendexResponse = await withBudget(6, operation: { [session] in
+            guard let (data, response) = try? await session.data(from: url),
+                  (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return try? JSONDecoder().decode(GutendexResponse.self, from: data)
+        }) else { return nil }
 
         for item in decoded.results ?? [] {
             guard let itemTitle = item.title,

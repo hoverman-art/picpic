@@ -14,6 +14,16 @@ struct FreeLibraryView: View {
     @Query(sort: \Book.dateAdded, order: .reverse) private var books: [Book]
     @Environment(\.dismiss) private var dismiss
 
+    /// Ce qu'il faut pour ouvrir la liseuse, d'où que vienne le livre.
+    struct ReadableBook: Identifiable {
+        let title: String
+        let epubURL: URL
+        /// Clé de reprise de lecture : l'ISBN si on l'a, sinon l'URL.
+        let key: String
+
+        var id: String { key }
+    }
+
     private struct LibraryHit: Identifiable {
         let book: Book
         let match: FreeReadingMatch
@@ -24,7 +34,7 @@ struct FreeLibraryView: View {
     @State private var libraryScanned = false
     @State private var classics: [FreeReadingService.DiscoveryBook] = []
     @State private var classicsLoaded = false
-    @State private var safariURL: IdentifiableURL?
+    @State private var bookToRead: ReadableBook?
     @State private var audiobookToPlay: FreeAudiobook?
 
     var body: some View {
@@ -47,8 +57,10 @@ struct FreeLibraryView: View {
             }
         }
         .task { await load() }
-        .sheet(item: $safariURL) { link in
-            SafariView(url: link.url).ignoresSafeArea()
+        .fullScreenCover(item: $bookToRead) { readable in
+            EPUBReaderView(epubURL: readable.epubURL,
+                           fallbackTitle: readable.title,
+                           progressKey: readable.key)
         }
         .sheet(item: $audiobookToPlay) { audiobook in
             AudioPlayerView(audiobook: audiobook)
@@ -107,7 +119,9 @@ struct FreeLibraryView: View {
             Spacer()
             if let ebook = hit.match.ebook {
                 iconButton("book.fill", identifier: "freelibrary.read.\(hit.book.isbn)") {
-                    safariURL = IdentifiableURL(url: ebook.epubURL)
+                    bookToRead = ReadableBook(title: hit.book.title,
+                                              epubURL: ebook.epubURL,
+                                              key: hit.book.isbn)
                 }
             }
             if let audiobook = hit.match.audiobook {
@@ -146,7 +160,9 @@ struct FreeLibraryView: View {
 
     private func classicRow(_ classic: FreeReadingService.DiscoveryBook) -> some View {
         Button {
-            safariURL = IdentifiableURL(url: classic.epubURL)
+            bookToRead = ReadableBook(title: classic.title,
+                                      epubURL: classic.epubURL,
+                                      key: classic.epubURL.absoluteString)
         } label: {
             HStack(spacing: 12) {
                 AsyncImage(url: classic.coverURL) { phase in

@@ -37,3 +37,29 @@ Ordre iPhone (la 1re capture fait ~70 % de l'impact) :
 - **In-App Events** : « Rentrée littéraire », « Ton Wrapped lecture » en décembre
 - Demander une note après le 3ᵉ scan réussi (RateAppModal existe déjà)
 - Texte promo à mettre à jour à chaque saison sans passer par la review
+
+## État — appliqué le 04/09/2026
+
+La 1.0 est passée `READY_FOR_SALE` (en ligne). `marketing/aso_11.py` a été exécuté :
+
+- version **1.1** créée (`5b96866b`), état PREPARE_FOR_SUBMISSION ;
+- nom → `Picpic : scan & suivi lecture`, sous-titre → `Bibliothèque, PAL & audio` ;
+- mots-clés 99 c., texte promo, nouveautés, 5 captures iPhone + 3 iPad avec accroches ;
+- **texte promo aussi appliqué sur la 1.0 live** (seul champ modifiable sans review → effet immédiat) ;
+- **description de la 1.1 réécrite** : « Lire & écouter gratuit » ajouté (livré mais absent
+  de la fiche 1.0) et retrait des promesses Pro non livrées (fiches de révision, widgets)
+  au profit de « Ta rétrospective ». Les liens EULA + confidentialité sont conservés
+  (correctif du rejet 3.1.2).
+
+Le nom, le sous-titre, les mots-clés et la description ne deviennent publics qu'à
+l'approbation d'une nouvelle version : il faut donc **un build 1.1 et une soumission**
+pour encaisser le gain ASO.
+
+### Ensuite (app live)
+
+1. Soumettre la 1.1 (build + soumission) — le pack ne sert à rien tant qu'elle n'est pas approuvée.
+2. Product Page Optimization : capture 1 « scan livre » vs « scan d'étagère ».
+3. Pages produit personnalisées : « étudiant » (BU/Sudoc) et « BookTok » (PAL/rétrospective).
+4. In-App Events : « Rentrée littéraire », « Ton Wrapped lecture » (décembre).
+5. Suivre les impressions/conversion dans ASC Analytics 7–14 jours après l'approbation
+   de la 1.1 pour mesurer l'effet du nom.

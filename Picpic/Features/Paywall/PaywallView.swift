@@ -89,6 +89,9 @@ struct PaywallView: View {
             featureRow(symbol: "camera.metering.matrix", tint: Theme.accent,
                        title: "Scan d'étagère",
                        detail: "Toute une étagère cataloguée en une photo.")
+            featureRow(symbol: "rectangle.and.pencil.and.ellipsis", tint: Theme.lavender,
+                       title: "Fiches de révision illimitées",
+                       detail: "Sans Pro : 3 livres par mois.")
             featureRow(symbol: "chart.bar.fill", tint: .purple,
                        title: "Ta rétrospective lecture",
                        detail: "Ton année en chiffres, calculée sur ton iPhone.")
@@ -214,7 +217,7 @@ struct PaywallView: View {
     }
 
     private var freeReminder: some View {
-        Text("Toujours gratuit, pour tout le monde : scans et livres illimités, recherche par idée, disponibilité autour de toi.")
+        Text("Toujours gratuit, pour tout le monde : scans et livres illimités, recherche par idée, disponibilité autour de toi, recherche Sudoc, objectifs et citations.")
             .font(.caption)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)

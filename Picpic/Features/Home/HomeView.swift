@@ -9,6 +9,14 @@
 import SwiftUI
 import SwiftData
 
+private enum HomeSheet: String, Identifiable {
+    case paywall, shelfScan, freeLibrary, stats, sudoc, goals, quotes
+    /// Ouverture directe de la liseuse — captures d'écran et vérification.
+    case reader
+
+    var id: String { rawValue }
+}
+
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(UserSettings.self) private var settings
@@ -22,11 +30,13 @@ struct HomeView: View {
     @State private var appeared = false
     @State private var navPath = NavigationPath()
     @State private var showScanFirstHint = false
-    @State private var showPaywall = false
-    @State private var showShelfScan = false
-    @State private var showFreeLibrary = false
-    @State private var showStats = false
+    /// Les écrans de fonctionnalité passent par une seule feuille : empiler
+    /// dix `.sheet` sur la même vue devient vite impossible à raisonner.
+    @State private var sheet: HomeSheet?
     @FocusState private var searchFocused: Bool
+    /// Réserve sous le contenu pour le bouton Scanner flottant : elle grandit
+    /// avec la taille de texte, sinon le bouton recouvre la dernière carte.
+    @ScaledMetric(relativeTo: .headline) private var scanButtonInset: CGFloat = 100
 
     private var displayedBooks: [Book] {
         searchText.isEmpty
@@ -42,25 +52,29 @@ struct HomeView: View {
                         .staggeredAppear(index: 0, isVisible: appeared)
                     searchBar
                         .staggeredAppear(index: 1, isVisible: appeared)
+                    campusCard
+                        .staggeredAppear(index: 2, isVisible: appeared)
+                    GoalStrip(books: books) { sheet = .goals }
+                        .staggeredAppear(index: 3, isVisible: appeared)
 
                     if books.isEmpty {
                         emptyState
-                            .staggeredAppear(index: 2, isVisible: appeared)
+                            .staggeredAppear(index: 4, isVisible: appeared)
                     } else {
                         bookShelf
-                            .staggeredAppear(index: 2, isVisible: appeared)
+                            .staggeredAppear(index: 4, isVisible: appeared)
                     }
 
                     if !proStore.isPro {
                         proBanner
-                            .staggeredAppear(index: 3, isVisible: appeared)
+                            .staggeredAppear(index: 5, isVisible: appeared)
                     }
 
                     featureGrid
-                        .staggeredAppear(index: 4, isVisible: appeared)
+                        .staggeredAppear(index: 6, isVisible: appeared)
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 100)
+                .padding(.bottom, scanButtonInset)
             }
             .background(Theme.paper)
             .overlay(alignment: .bottom) { scanButton }
@@ -82,17 +96,22 @@ struct HomeView: View {
             .fullScreenCover(isPresented: $showTutorial) {
                 TutorialView()
             }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-            }
-            .sheet(isPresented: $showShelfScan) {
-                ShelfScanView()
-            }
-            .sheet(isPresented: $showFreeLibrary) {
-                FreeLibraryView()
-            }
-            .sheet(isPresented: $showStats) {
-                StatsView()
+            .sheet(item: $sheet) { destination in
+                switch destination {
+                case .paywall: PaywallView()
+                case .shelfScan: ShelfScanView()
+                case .freeLibrary: FreeLibraryView()
+                case .stats: StatsView()
+                case .sudoc: SudocSearchView()
+                case .goals: GoalsView()
+                case .quotes: QuotesView()
+                case .reader:
+                    EPUBReaderView(
+                        epubURL: URL(string: "https://www.gutenberg.org/ebooks/62215.epub3.images")!,
+                        fallbackTitle: "Le Fantôme de l'Opéra",
+                        progressKey: "uitest-reader"
+                    )
+                }
             }
             .sheet(isPresented: $viewModel.showRateModal) {
                 RateAppModal()
@@ -119,10 +138,17 @@ struct HomeView: View {
             if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "-uitest-open"),
                index + 1 < ProcessInfo.processInfo.arguments.count {
                 switch ProcessInfo.processInfo.arguments[index + 1] {
-                case "paywall": showPaywall = true
-                case "shelfscan": showShelfScan = true
-                case "freereading": showFreeLibrary = true
-                case "stats": showStats = true
+                case "paywall": sheet = .paywall
+                case "shelfscan": sheet = .shelfScan
+                case "freereading": sheet = .freeLibrary
+                case "stats": sheet = .stats
+                case "sudoc": sheet = .sudoc
+                case "goals": sheet = .goals
+                case "quotes": sheet = .quotes
+                case "tutorial": showTutorial = true
+                case "reader": sheet = .reader
+                case "bookdetail":
+                    if let first = books.first { navPath.append(first) }
                 default: break
                 }
             }
@@ -178,6 +204,48 @@ struct HomeView: View {
         .shadow(color: Theme.ink.opacity(0.06), radius: 10, y: 4)
     }
 
+    /// Sudoc en tête d'accueil : la recherche par sujet dans le fonds d'une BU
+    /// est ce que Picpic fait de plus singulier, et le premier geste utile
+    /// quand la bibliothèque est encore vide.
+    private var campusCard: some View {
+        Button {
+            sheet = .sudoc
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "building.columns.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.teal, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(campusTitle)
+                        .font(.headline)
+                        .foregroundStyle(Theme.ink)
+                    Text("Cherche par sujet dans le catalogue des BU françaises et vois ce que la bibliothèque a en rayon.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Theme.teal.opacity(0.25), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityIdentifier("home.campusCard")
+    }
+
+    private var campusTitle: String {
+        settings.studyField.map { "\($0.label) à la BU" } ?? "Ta filière à la BU"
+    }
+
     private var emptyState: some View {
         VStack(spacing: 12) {
             MascotView(pose: .reading, height: 130)
@@ -226,7 +294,7 @@ struct HomeView: View {
 
     private var proBanner: some View {
         Button {
-            showPaywall = true
+            sheet = .paywall
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "sparkles")
@@ -280,15 +348,21 @@ struct HomeView: View {
         case "shelfscan":
             return {
                 if proStore.isPro {
-                    showShelfScan = true
+                    sheet = .shelfScan
                 } else {
-                    showPaywall = true
+                    sheet = .paywall
                 }
             }
+        case "sudoc":
+            return { sheet = .sudoc }
+        case "goals":
+            return { sheet = .goals }
+        case "quotes":
+            return { sheet = .quotes }
         case "semantic":
             return { searchFocused = true }
         case "freereading":
-            return { showFreeLibrary = true }
+            return { sheet = .freeLibrary }
         case "availability":
             return {
                 if let latest = books.first {
@@ -300,9 +374,9 @@ struct HomeView: View {
         case "stats":
             return {
                 if proStore.isPro {
-                    showStats = true
+                    sheet = .stats
                 } else {
-                    showPaywall = true
+                    sheet = .paywall
                 }
             }
         default:

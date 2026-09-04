@@ -51,6 +51,52 @@ enum StudyField: String, CaseIterable, Identifiable, Codable {
         case .langues: return "Langues"
         }
     }
+
+    var symbol: String {
+        switch self {
+        case .droit: return "building.columns"
+        case .sciences: return "atom"
+        case .lettres: return "text.book.closed"
+        case .histoire: return "globe.europe.africa"
+        case .eco: return "chart.line.uptrend.xyaxis"
+        case .sante: return "cross.case"
+        case .info: return "chevron.left.forwardslash.chevron.right"
+        case .langues: return "character.bubble"
+        }
+    }
+
+    /// Vedettes-matière Rameau proposées pour la filière, dans l'ordre
+    /// d'entrée en matière. Chacune a été vérifiée contre le fonds réel de la
+    /// BU de La Rochelle (aucune ne renvoie moins d'une cinquantaine de
+    /// notices) : une puce qui ouvre sur une liste vide serait pire qu'absente.
+    var sudocSubjects: [String] {
+        switch self {
+        case .droit:
+            return ["droit constitutionnel", "droit civil", "droit administratif",
+                    "droit pénal", "droit international", "droit du travail"]
+        case .sciences:
+            return ["mathématiques", "physique", "chimie", "biologie",
+                    "écologie", "statistique"]
+        case .lettres:
+            return ["littérature française", "roman", "poésie", "théâtre",
+                    "littérature comparée", "stylistique"]
+        case .histoire:
+            return ["histoire de France", "géographie", "archéologie",
+                    "géopolitique", "histoire moderne", "histoire contemporaine"]
+        case .eco:
+            return ["gestion d'entreprise", "management", "économie politique",
+                    "marketing", "finances", "comptabilité"]
+        case .sante:
+            return ["psychologie", "médecine", "santé publique", "anatomie",
+                    "soins infirmiers", "pharmacologie"]
+        case .info:
+            return ["informatique", "réseaux d'ordinateurs", "programmation",
+                    "intelligence artificielle", "bases de données", "cybersécurité"]
+        case .langues:
+            return ["linguistique", "anglais (langue)", "traduction",
+                    "espagnol (langue)", "littérature anglaise", "didactique des langues"]
+        }
+    }
 }
 
 /// App-wide user settings persisted in UserDefaults (zero backend).

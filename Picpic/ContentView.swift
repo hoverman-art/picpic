@@ -12,10 +12,18 @@ struct ContentView: View {
 
     var body: some View {
         content
+            // Plafond des grandes tailles de texte : au-delà, la mise en page
+            // « encre & papier » (cartes denses, titres sérif à taille fixe)
+            // ne tient plus. accessibility1 reste nettement plus gros que le
+            // réglage par défaut, et tous les écrans défilent désormais.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .task {
                 // UI tests pass this flag to start from an empty library.
                 if ProcessInfo.processInfo.arguments.contains("-uitest-reset-books") {
                     try? modelContext.delete(model: Book.self)
+                    // Les citations aussi : un test qui en garde une ne doit
+                    // pas polluer le suivant.
+                    try? modelContext.delete(model: Quote.self)
                     try? modelContext.save()
                 }
                 // Bibliothèque de démonstration pour captures d'écran et previews.

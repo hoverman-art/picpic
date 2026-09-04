@@ -36,16 +36,18 @@ struct OnboardingView: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
 
-                Group {
-                    switch page {
-                    case 0: welcomePage
-                    case 1: featuresPage
-                    case 2: profilePage
-                    default: readyPage
+                CenteredScrollPage {
+                    Group {
+                        switch page {
+                        case 0: welcomePage
+                        case 1: featuresPage
+                        case 2: profilePage
+                        default: readyPage
+                        }
                     }
+                    .id(page)
+                    .transition(.blurSlide())
                 }
-                .id(page)
-                .transition(.blurSlide())
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 continueButton
@@ -60,7 +62,6 @@ struct OnboardingView: View {
 
     private var welcomePage: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Spacer()
             MascotView(pose: .wave, height: 170)
                 .staggeredAppear(index: 0, isVisible: pageVisible)
             AnimatedText(text: "Tous tes livres, à portée de scan.", isVisible: pageVisible)
@@ -68,16 +69,14 @@ struct OnboardingView: View {
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.75))
                 .staggeredAppear(index: 4, isVisible: pageVisible)
-            Spacer()
-            Spacer()
         }
         .padding(.horizontal, 28)
+        .padding(.vertical, 24)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var featuresPage: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Spacer()
             HStack {
                 Spacer()
                 MascotView(pose: .idea, height: 120)
@@ -93,9 +92,9 @@ struct OnboardingView: View {
                 featureCard(index: 2, symbol: "sparkles", title: "Recherche intelligente",
                             text: "Cherche par idée — « roman sur la mer » — grâce à la recherche sémantique, 100 % sur ton iPhone.")
             }
-            Spacer()
         }
         .padding(.horizontal, 28)
+        .padding(.vertical, 24)
     }
 
     private func featureCard(index: Int, symbol: String, title: String, text: String) -> some View {
@@ -103,7 +102,7 @@ struct OnboardingView: View {
             Image(systemName: symbol)
                 .font(.title3)
                 .foregroundStyle(Theme.gold)
-                .frame(width: 34)
+                .frame(minWidth: 34, alignment: .leading)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.headline).foregroundStyle(.white)
                 Text(text).font(.subheadline).foregroundStyle(.white.opacity(0.72))
@@ -117,7 +116,6 @@ struct OnboardingView: View {
 
     private var profilePage: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Spacer()
             HStack {
                 Spacer()
                 MascotView(pose: .question, height: 120)
@@ -134,9 +132,9 @@ struct OnboardingView: View {
                 fieldPicker
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            Spacer()
         }
         .padding(.horizontal, 28)
+        .padding(.vertical, 24)
         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: selectedProfile)
     }
 
@@ -149,7 +147,7 @@ struct OnboardingView: View {
                 Image(systemName: profile.symbol)
                     .font(.title2)
                     .foregroundStyle(isSelected ? Theme.ink : .white)
-                    .frame(width: 40)
+                    .frame(minWidth: 40, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(profile.label)
                         .font(.headline)
@@ -201,7 +199,6 @@ struct OnboardingView: View {
 
     private var readyPage: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Spacer()
             MascotView(pose: .flying, height: 160)
                 .staggeredAppear(index: 0, isVisible: pageVisible)
             AnimatedText(text: "Prêt·e à scanner ton premier livre ?", isVisible: pageVisible, font: .display(30))
@@ -209,10 +206,9 @@ struct OnboardingView: View {
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.75))
                 .staggeredAppear(index: 4, isVisible: pageVisible)
-            Spacer()
-            Spacer()
         }
         .padding(.horizontal, 28)
+        .padding(.vertical, 24)
     }
 
     // MARK: - Chrome
