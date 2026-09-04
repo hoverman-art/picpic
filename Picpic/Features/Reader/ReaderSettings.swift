@@ -5,6 +5,7 @@
 //  Les réglages de confort de la liseuse, retenus d'un livre à l'autre.
 //
 
+import AVFoundation
 import Foundation
 import SwiftUI
 
@@ -118,6 +119,16 @@ final class ReaderSettings {
         didSet { UserDefaults.standard.set(fontSize, forKey: "reader.fontSize") }
     }
 
+    /// Voix de lecture choisie, parmi celles installées sur l'appareil.
+    var voiceIdentifier: String? {
+        didSet { UserDefaults.standard.set(voiceIdentifier, forKey: "reader.voice") }
+    }
+
+    /// Débit, entre `AVSpeechUtteranceMinimumSpeechRate` et le maximum.
+    var speechRate: Double {
+        didSet { UserDefaults.standard.set(speechRate, forKey: "reader.speechRate") }
+    }
+
     private init() {
         let defaults = UserDefaults.standard
         theme = Theme(rawValue: defaults.string(forKey: "reader.theme") ?? "") ?? .paper
@@ -125,6 +136,29 @@ final class ReaderSettings {
         spacing = Spacing(rawValue: defaults.string(forKey: "reader.spacing") ?? "") ?? .normal
         let saved = defaults.double(forKey: "reader.fontSize")
         fontSize = saved > 0 ? saved : 19
+        voiceIdentifier = defaults.string(forKey: "reader.voice")
+        let rate = defaults.double(forKey: "reader.speechRate")
+        speechRate = rate > 0 ? rate : Double(AVSpeechUtteranceDefaultSpeechRate)
+    }
+
+    // MARK: - Voix
+
+    /// La voix à utiliser : celle choisie si elle est toujours installée,
+    /// sinon la meilleure disponible. Une voix peut disparaître (l'utilisateur
+    /// l'a supprimée dans les Réglages) — ne pas retomber sur `nil` évite que
+    /// la lecture se fasse soudain dans la langue du système.
+    func selectedVoice() -> AVSpeechSynthesisVoice? {
+        if let voiceIdentifier, let voice = AVSpeechSynthesisVoice(identifier: voiceIdentifier) {
+            return voice
+        }
+        return bestAvailableVoice()
+    }
+
+    func bestAvailableVoice(language: String = "fr") -> AVSpeechSynthesisVoice? {
+        let best = AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix(language) }
+            .max { $0.quality.rawValue < $1.quality.rawValue }
+        return best ?? AVSpeechSynthesisVoice(language: "fr-FR")
     }
 
     // MARK: - Progression
@@ -160,6 +194,15 @@ final class ReaderSettings {
         table { max-width: 100%; display: block; overflow-x: auto; }
         pre { white-space: pre-wrap; word-wrap: break-word; }
         hr { border: 0; border-top: 1px solid currentColor; opacity: 0.2; margin: 2em 0; }
+        /* Paragraphe en cours de lecture à voix haute. */
+        .pp-now {
+            background: rgba(240, 112, 80, 0.20);
+            border-radius: 6px;
+            box-shadow: 0 0 0 6px rgba(240, 112, 80, 0.20);
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            .pp-now { transition: background 0.25s ease; }
+        }
         """
     }
 }

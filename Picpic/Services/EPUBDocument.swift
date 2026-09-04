@@ -84,8 +84,129 @@ nonisolated struct EPUBDocument: Sendable {
 
     /// Le XHTML d'un chapitre, prêt à être affiché.
     func html(for chapter: EPUBChapter) throws -> String? {
+        try readable(chapter)?.html
+    }
+
+    /// Le chapitre découpé pour la lecture à voix haute : le HTML dont chaque
+    /// bloc porte un `data-pp`, et le texte de ces blocs dans le même ordre.
+    /// Les deux tableaux sont alignés par indice — c'est ce qui permet de
+    /// surligner le paragraphe qu'on entend.
+    func readable(_ chapter: EPUBChapter) throws -> (html: String, paragraphs: [String])? {
         guard let raw = try archive.string(for: chapter.path) else { return nil }
-        return inliningImages(in: Self.bodyContent(of: raw), chapterPath: chapter.path)
+        let body = Self.strippingScripts(Self.bodyContent(of: raw))
+        let inlined = inliningImages(in: body, chapterPath: chapter.path)
+        return Self.markingParagraphs(in: inlined)
+    }
+
+    /// Retire les scripts de l'EPUB. La liseuse exécute son propre script pour
+    /// surligner ce qui est lu ; hors de question de laisser tourner en plus
+    /// celui d'un fichier venu du web.
+    private static func strippingScripts(_ html: String) -> String {
+        var result = ""
+        var rest = Substring(html)
+        while let open = rest.range(of: "<script", options: .caseInsensitive) {
+            result += rest[rest.startIndex ..< open.lowerBound]
+            guard let close = rest.range(of: "</script>", options: .caseInsensitive,
+                                         range: open.upperBound ..< rest.endIndex) else {
+                return result
+            }
+            rest = rest[close.upperBound...]
+        }
+        result += rest
+        // Et les gestionnaires en attribut (`onclick="…"`), même raison.
+        return result.replacingOccurrences(
+            of: "\\son[a-z]+\\s*=\\s*\"[^\"]*\"",
+            with: "", options: [.regularExpression, .caseInsensitive])
+    }
+
+    /// Balises de bloc dont le texte forme une unité de lecture.
+    private static let blockTags = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "li"]
+
+    private static func markingParagraphs(in html: String) -> (html: String, paragraphs: [String]) {
+        var output = ""
+        var paragraphs: [String] = []
+        var cursor = html.startIndex
+
+        while cursor < html.endIndex {
+            guard let (tagName, open, openEnd) = nextBlockTag(in: html, from: cursor) else {
+                output += html[cursor...]
+                break
+            }
+            guard let close = matchingClose(of: tagName, in: html, after: openEnd) else {
+                output += html[cursor ..< openEnd]
+                cursor = openEnd
+                continue
+            }
+
+            let inner = String(html[openEnd ..< close.lowerBound])
+            let text = strippingTags(inner)
+            output += html[cursor ..< open.lowerBound]
+
+            if text.count >= 2 {
+                // On insère le marqueur juste après le nom de la balise, ce qui
+                // préserve les attributs déjà présents.
+                let openTag = String(html[open.lowerBound ..< openEnd])
+                let marked = openTag.replacingOccurrences(
+                    of: "<\(tagName)", with: "<\(tagName) data-pp=\"\(paragraphs.count)\"",
+                    options: .caseInsensitive, range: openTag.range(of: "<\(tagName)", options: .caseInsensitive))
+                output += marked
+                paragraphs.append(text)
+            } else {
+                output += html[open.lowerBound ..< openEnd]
+            }
+            output += html[openEnd ..< close.lowerBound]
+            output += html[close.lowerBound ..< close.upperBound]
+            cursor = close.upperBound
+        }
+        return (output, paragraphs)
+    }
+
+    private static func nextBlockTag(
+        in html: String, from index: String.Index
+    ) -> (name: String, open: Range<String.Index>, contentStart: String.Index)? {
+        var best: (String, Range<String.Index>, String.Index)?
+        for tag in blockTags {
+            var searchFrom = index
+            // `<p` ne doit pas capturer `<param` : on exige un délimiteur après.
+            while let open = html.range(of: "<\(tag)", options: .caseInsensitive,
+                                        range: searchFrom ..< html.endIndex) {
+                let after = open.upperBound
+                if after < html.endIndex, let scalar = html[after].unicodeScalars.first,
+                   CharacterSet.alphanumerics.contains(scalar) {
+                    searchFrom = after
+                    continue
+                }
+                guard let end = html.range(of: ">", range: after ..< html.endIndex) else { break }
+                if best == nil || open.lowerBound < best!.1.lowerBound {
+                    best = (tag, open, end.upperBound)
+                }
+                break
+            }
+        }
+        return best.map { (name: $0.0, open: $0.1, contentStart: $0.2) }
+    }
+
+    /// Balise fermante correspondante, en tenant compte des imbrications
+    /// (`<li>` dans `<li>`).
+    private static func matchingClose(
+        of tag: String, in html: String, after index: String.Index
+    ) -> Range<String.Index>? {
+        var depth = 1
+        var cursor = index
+        while cursor < html.endIndex {
+            let nextOpen = html.range(of: "<\(tag)", options: .caseInsensitive, range: cursor ..< html.endIndex)
+            guard let nextClose = html.range(of: "</\(tag)>", options: .caseInsensitive,
+                                             range: cursor ..< html.endIndex) else { return nil }
+            if let nextOpen, nextOpen.lowerBound < nextClose.lowerBound {
+                depth += 1
+                cursor = nextOpen.upperBound
+                continue
+            }
+            depth -= 1
+            if depth == 0 { return nextClose }
+            cursor = nextClose.upperBound
+        }
+        return nil
     }
 
     /// Remplace les images relatives par leur contenu en `data:`.

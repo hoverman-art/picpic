@@ -67,6 +67,15 @@ n'existe dans aucune autre app de lecture.
    (un livre ouvert se relit hors connexion). Images de l'archive intégrées en `data:`,
    sans quoi les couvertures s'affichaient blanches.
 
+7. **Lecture à voix haute** (gratuit) — n'importe quel livre de la liseuse se fait lire
+   sur l'appareil, paragraphe par paragraphe : surlignage de ce qu'on entend, défilement
+   suivi, pause/paragraphe précédent-suivant, enchaînement des chapitres, commandes sur
+   l'écran verrouillé, choix de la voix (classée par qualité, avec extrait) et du débit.
+   **Limite Apple à connaître** : les voix « Améliorée » et « Premium » ne sont pas
+   installées par défaut et aucune API ne permet à une app de les installer ou de les
+   embarquer — Picpic prend donc la meilleure voix présente et dit où ajouter les autres.
+   Détail et solution de repli dans docs/LECTURE-VOIX-HAUTE.md.
+
 ### Correctifs de la même livraison
 
 - **Apparence verrouillée en clair** (`INFOPLIST_KEY_UIUserInterfaceStyle = Light`) : le

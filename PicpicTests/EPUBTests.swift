@@ -19,33 +19,34 @@ struct EPUBTests {
     /// hors spine (CSS, couverture).
     private static let fixtureBase64 =
         "UEsDBBQAAAAAAAAAIQBvYassFAAAABQAAAAIAAAAbWltZXR5cGVhcHBsaWNhdGlvbi9lcHViK3pp" +
-        "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
+        "cFBLAwQUAAAACADPlCRdMEhmOp4AAADfAAAAFgAAAE1FVEEtSU5GL2NvbnRhaW5lci54bWxVjs0K" +
         "AiEUhffzFOI2ZqytqEHQuqAnuOPcKRn1ijpRb5+0mGh34Px8Rx1fwbMn5uIoan4Y9vxoOmUpVnAR" +
         "87/FWjgWzdccJUFxRUYIWGS1khLGiewaMFb5jclthJuOMZWJ6uw8FrNJNq/e9wnqQ/PL+XS9iZFo" +
-        "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
+        "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
-        "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" +
-        "dQQAAAAA"
+        "7WFTdQrGY1t02ZGNxZTHhddwM4YwEasa5k/U/gBQSwMEFAAAAAgAz5QkXcNAuhYZAQAAhwEAABMA" +
+        "AABPRUJQUy90ZXh0L3VuLnhodG1sNZBBTsQwDEX3cworm5mRUELFalCaWSMhseIAIbFaizQJadrO" +
+        "CHEgzsHFcKewiuLnb/9vfb4MAWYsI6XYikbei7PZ6b5ylUkcW9HXmh+VWpZFLg8ylU41p9NJXdYe" +
+        "YXSP1htdqQY0T11M5edbq+2702O98vuW/PXTpZDKY0H/pdVW1uqm3emV86DGvEzspE4FGTVGZ/OM" +
+        "kAsOhAWyLbYrNvcIfoJAc0GpVWZ5Nq8RRnQp+juwMzrQZDxC2FO1gT4mHkcG7AQDBcLpT0ZDB2Nx" +
+        "rZBS0WA7HJVLvF/m2AmwobbCpX9DQq1pXKFczULRp0XawOiwz3YEcrQ/cqyNsyNI0QVy762YE7cd" +
+        "jmKN4rFEjnLbr9WWWq1nNL9QSwMEFAAAAAgAz5QkXW+8Gdh8AAAAlgAAABUAAABPRUJQUy90ZXh0" +
+        "L2RldXgueGh0bWwljEEOwiAQAO99BeHgkbXxhG63B5/gCzCgkLSF0K3g76X2OjMZHOs8iY/La4jL" +
+        "IHt1liN16LnRZpZ1kJ45XQFKKapcVMxv6LXWUPdGEnpnLCEHnhzdvUmBsxPWbRXhgAj/pMNntF/C" +
+        "RI8tsBMnM6ebeIVFIaQWHRb2K/0AUEsDBBQAAAAAAM+UJF0mpJUHRgAAAEYAAAAWAAAAT0VCUFMv" +
+        "aW1hZ2VzL2NvdmVyLnBuZ4lQTkcNChoKAAAADUlIRFIAAAABAAAAAQgGAAAAHxXEiQAAAA1JREFU" +
+        "eNpj/M/AUA8ABIUBgISpjCEAAAAASUVORK5CYIJQSwECFAMUAAAAAAAAACEAb2GrLBQAAAAUAAAA" +
+        "CAAAAAAAAAAAAAAAgAEAAAAAbWltZXR5cGVQSwECFAMUAAAACADPlCRdMEhmOp4AAADfAAAAFgAA" +
+        "AAAAAAAAAAAAgAE6AAAATUVUQS1JTkYvY29udGFpbmVyLnhtbFBLAQIUAxQAAAAIAM+UJF3HrXR/" +
+        "HwEAAGQCAAAOAAAAAAAAAAAAAACAAQwBAABPRUJQUy9ib29rLm9wZlBLAQIUAxQAAAAIAM+UJF3D" +
+        "QLoWGQEAAIcBAAATAAAAAAAAAAAAAACAAVcCAABPRUJQUy90ZXh0L3VuLnhodG1sUEsBAhQDFAAA" +
+        "AAgAz5QkXW+8Gdh8AAAAlgAAABUAAAAAAAAAAAAAAIABoQMAAE9FQlBTL3RleHQvZGV1eC54aHRt" +
+        "bFBLAQIUAxQAAAAAAM+UJF0mpJUHRgAAAEYAAAAWAAAAAAAAAAAAAACAAVAEAABPRUJQUy9pbWFn" +
+        "ZXMvY292ZXIucG5nUEsFBgAAAAAGAAYAfgEAAMoEAAAAAA=="
 
     private func makeDocument() throws -> EPUBDocument {
         let data = try #require(Data(base64Encoded: Self.fixtureBase64))
@@ -121,5 +122,45 @@ struct EPUBTests {
         let document = try makeDocument()
         let excerpt = try #require(document.excerpt(for: document.chapters[1]))
         #expect(excerpt == "Suite & fin.")
+    }
+
+    // MARK: - Découpage pour la lecture à voix haute
+
+    /// Chaque bloc de texte doit être numéroté dans le HTML et présent, dans le
+    /// même ordre, dans la liste des paragraphes : c'est cet alignement qui
+    /// permet de surligner le paragraphe que l'on entend.
+    @Test func paragraphsAreMarkedAndAlignedWithTheHTML() throws {
+        let document = try makeDocument()
+        let readable = try #require(try document.readable(document.chapters[0]))
+
+        #expect(readable.paragraphs == [
+            "Ouverture",
+            "Le premier paragraphe du livre.",
+            "Un second, avec de l'italique au milieu.",
+            "Le dernier.",
+        ])
+        for index in readable.paragraphs.indices {
+            #expect(readable.html.contains("data-pp=\"\(index)\""),
+                    "Le bloc \(index) doit être adressable depuis le script de surlignage")
+        }
+    }
+
+    /// Le texte d'un paragraphe traverse les balises en ligne : couper à
+    /// `<i>` donnerait une lecture hachée.
+    @Test func inlineMarkupDoesNotSplitAParagraph() throws {
+        let document = try makeDocument()
+        let readable = try #require(try document.readable(document.chapters[0]))
+        #expect(readable.paragraphs[2] == "Un second, avec de l'italique au milieu.")
+    }
+
+    /// La liseuse exécute son propre script ; celui de l'EPUB, jamais.
+    @Test func epubScriptsAndHandlersAreRemoved() throws {
+        let document = try makeDocument()
+        let readable = try #require(try document.readable(document.chapters[0]))
+        #expect(!readable.html.contains("<script"))
+        #expect(!readable.html.contains("window.alert"))
+        #expect(!readable.html.contains("onclick"))
+        // Le paragraphe qui portait le gestionnaire reste lisible.
+        #expect(readable.html.contains("Le dernier."))
     }
 }
