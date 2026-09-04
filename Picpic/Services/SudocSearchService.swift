@@ -85,6 +85,9 @@ nonisolated enum SudocIndex: String, CaseIterable, Identifiable, Sendable {
     case title = "mti"
     case author = "aut"
     case everything = "tou"
+    /// Recherche par ISBN — pas proposée dans l'écran, utilisée pour compléter
+    /// les métadonnées d'un livre scanné.
+    case isbn = "isb"
 
     var id: String { rawValue }
 
@@ -94,8 +97,13 @@ nonisolated enum SudocIndex: String, CaseIterable, Identifiable, Sendable {
         case .title: return "Titre"
         case .author: return "Auteur"
         case .everything: return "Partout"
+        case .isbn: return "ISBN"
         }
     }
+
+    /// Ce que l'écran de recherche propose. `isbn` en est exclu : il sert au
+    /// complément de métadonnées d'un livre scanné, pas à une recherche à la main.
+    static var browsable: [SudocIndex] { [.subject, .title, .author, .everything] }
 }
 
 nonisolated struct SudocQuery: Hashable, Sendable {
@@ -210,6 +218,18 @@ actor SudocSearchService {
         ],
         totalRecords: 3
     )
+
+    /// Notice correspondant à un ISBN précis (index `isb`).
+    ///
+    /// Le Sudoc sert ici de troisième source de métadonnées : il est officiel,
+    /// sans clé, et il a tenu tout du long là où Google Books tombe en quota et
+    /// Open Library répond une fois sur deux.
+    func record(isbn: String) async -> SudocRecord? {
+        let digits = isbn.filter { $0.isNumber || $0 == "X" }
+        guard !digits.isEmpty else { return nil }
+        let query = SudocQuery(terms: digits, index: .isbn, scope: .france, frenchOnly: false)
+        return try? await search(query, pageSize: 1).records.first
+    }
 
     private func throttle() async {
         let elapsed = Date().timeIntervalSince(lastRequest)

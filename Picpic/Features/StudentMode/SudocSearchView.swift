@@ -90,7 +90,7 @@ struct SudocSearchView: View {
 
             Menu {
                 Picker("Chercher dans", selection: $viewModel.index) {
-                    ForEach(SudocIndex.allCases) { index in
+                    ForEach(SudocIndex.browsable) { index in
                         Text(index.label).tag(index)
                     }
                 }

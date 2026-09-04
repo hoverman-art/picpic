@@ -28,26 +28,85 @@ enum BookMetadataError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notFound: return "Livre introuvable dans les catalogues ouverts."
+        // Trois catalogues muets, c'est presque toujours le réseau ou une
+        // panne côté source — pas un livre absent. Le message le dit, et
+        // propose la seule action utile.
+        case .notFound:
+            return "Impossible de retrouver ce livre pour l'instant. Vérifie ta connexion et réessaie, ou saisis-le depuis « Ma filière à la BU »."
         case .network: return "Connexion impossible. Vérifie ton réseau."
         }
     }
 }
 
 struct BookMetadataService {
-    private let session: URLSession = .shared
+    /// Session dédiée : `URLSession.shared` attend 60 s, or la boucle
+    /// parallèle ne rend la main qu'une fois toutes les sources retombées.
+    /// Un catalogue qui traîne bloquerait l'écran une minute.
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 10
+        config.timeoutIntervalForResource = 15
+        config.httpMaximumConnectionsPerHost = 6
+        return URLSession(configuration: config)
+    }()
 
-    // Cascade: Google Books first (best French coverage + descriptions),
-    // then Open Library. Both are keyless and HTTPS.
+    /// Trois catalogues interrogés **en parallèle**, pas en cascade.
+    ///
+    /// La cascade coûtait trop cher le jour où une source flanche : mesuré le
+    /// 04/09/2026, Google Books renvoyait 429 (quota de l'accès sans clé
+    /// épuisé) et Open Library échouait 3 fois sur 8 en mettant 8 à 22 s.
+    /// L'utilisateur voyait alors « Livre introuvable » sur un livre qui
+    /// existe. En parallèle, la latence est celle de la source la plus rapide
+    /// et il faut que les trois tombent en même temps pour échouer.
+    ///
+    /// Le Sudoc est la troisième source : officiel, sans clé, et il n'a pas
+    /// bronché — il n'a ni résumé ni couverture, mais un livre correctement
+    /// identifié vaut mieux qu'une erreur.
     func fetch(isbn rawISBN: String) async throws -> BookMetadata {
-        let isbn = rawISBN.filter(\.isNumber)
-        if let google = try? await fetchFromGoogleBooks(isbn: isbn) {
-            return google
+        let isbn = rawISBN.filter { $0.isNumber || $0 == "X" }
+        guard !isbn.isEmpty else { throw BookMetadataError.notFound }
+
+        // Rang = richesse de la fiche : Google Books porte le résumé, Open
+        // Library la couverture et les thèmes, le Sudoc l'essentiel.
+        let results = await withTaskGroup(of: (Int, BookMetadata?).self) { group in
+            group.addTask { (0, try? await self.fetchFromGoogleBooks(isbn: isbn)) }
+            group.addTask { (1, try? await self.fetchFromOpenLibrary(isbn: isbn)) }
+            group.addTask { (2, await self.fetchFromSudoc(isbn: isbn)) }
+
+            var best: (rank: Int, metadata: BookMetadata)?
+            for await (rank, metadata) in group {
+                guard let metadata else { continue }
+                if best == nil || rank < best!.rank {
+                    best = (rank, metadata)
+                }
+                // Google Books a répondu : inutile d'attendre les autres.
+                if rank == 0 { group.cancelAll(); break }
+            }
+            return best?.metadata
         }
-        if let openLibrary = try? await fetchFromOpenLibrary(isbn: isbn) {
-            return openLibrary
-        }
-        throw BookMetadataError.notFound
+
+        guard let results else { throw BookMetadataError.notFound }
+        return results
+    }
+
+    // MARK: - Sudoc (troisième source, sans résumé ni couverture propre)
+
+    private func fetchFromSudoc(isbn: String) async -> BookMetadata? {
+        guard let record = await SudocSearchService.shared.record(isbn: isbn) else { return nil }
+        return BookMetadata(
+            isbn: isbn,
+            title: record.title,
+            authors: record.authors,
+            description: nil,
+            subjects: Array(record.subjects.prefix(8)),
+            // La couverture d'Open Library s'obtient par ISBN, sans passer par
+            // son API de métadonnées — donc disponible même quand celle-ci tombe.
+            coverURLString: "https://covers.openlibrary.org/b/isbn/\(isbn)-L.jpg",
+            publisher: record.publisher,
+            publishedDate: record.year,
+            pageCount: nil,
+            language: "fr"
+        )
     }
 
     // MARK: - Open Library

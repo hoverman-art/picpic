@@ -85,3 +85,33 @@ Correctifs dans `FreeReadingService` : budget de 6 s propre à la recherche Gute
 de 25 s à 10 s, et `httpMaximumConnectionsPerHost = 6`. À surveiller : si `?search=`
 revient, rien ne change ; s'il disparaît durablement, basculer la recherche d'ebooks
 entièrement sur Wikisource.
+
+## Métadonnées : trois catalogues en parallèle (04/09/2026)
+
+Mesures faites ce jour-là, qui ont motivé le changement :
+
+| Source | Constat |
+|---|---|
+| Google Books (sans clé) | **HTTP 429** — « Quota exceeded […] Queries per day » sur le projet anonyme partagé. Le quota n'est pas propre à l'app : il peut être épuisé sans qu'on y soit pour rien. |
+| Open Library | **3 échecs sur 8**, et 8 à 22 s quand elle répond. |
+| Sudoc (SRU, index `isb`) | Aucune défaillance de la journée, ~1 s. |
+
+Avec l'ancienne cascade (Google puis Open Library), l'utilisateur voyait
+« Livre introuvable dans les catalogues ouverts » sur un livre qui existe —
+constaté sur *L'Étranger*, ISBN 9782070360024.
+
+`BookMetadataService.fetch` interroge désormais **les trois en parallèle** :
+
+- la latence est celle de la source la plus rapide, plus la somme des lenteurs ;
+- il faut que les trois tombent en même temps pour échouer ;
+- la fiche retenue est la plus riche parmi celles qui ont répondu (Google Books
+  porte le résumé, Open Library la couverture et les thèmes, le Sudoc
+  l'essentiel), et la réponse de Google Books court-circuite l'attente ;
+- session dédiée avec un délai de 10 s : la boucle attend toutes les sources,
+  et les 60 s de `URLSession.shared` auraient figé l'écran une minute.
+
+La couverture reste disponible même quand l'API d'Open Library tombe : le
+service d'images `covers.openlibrary.org/b/isbn/<isbn>-L.jpg` est indépendant.
+
+Le message d'erreur ne prétend plus que le livre n'existe pas : trois catalogues
+muets, c'est presque toujours le réseau ou une panne de source.
