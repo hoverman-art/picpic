@@ -10,6 +10,9 @@ import SwiftData
 struct PicpicApp: App {
     @State private var settings = UserSettings.shared
     @State private var proStore = ProStore.shared
+    @State private var goals = ReadingGoalStore.shared
+    @State private var revisionStore = RevisionSheetStore.shared
+    @State private var readerSettings = ReaderSettings.shared
 
     init() {
         ProStore.configure()
@@ -20,9 +23,13 @@ struct PicpicApp: App {
             ContentView()
                 .environment(settings)
                 .environment(proStore)
+                .environment(goals)
+                .environment(revisionStore)
+                .environment(readerSettings)
                 .animation(.easeInOut(duration: 0.5), value: settings.hasCompletedOnboarding)
                 .task { await proStore.observeCustomerInfo() }
+                .onAppear { goals.refreshStreak() }
         }
-        .modelContainer(for: Book.self)
+        .modelContainer(for: [Book.self, Quote.self])
     }
 }

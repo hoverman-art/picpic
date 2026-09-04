@@ -77,7 +77,9 @@ struct WrappingHStack: Layout {
         let maxWidth = proposal.width ?? .infinity
         var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, usedWidth: CGFloat = 0
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            // Proposer la largeur disponible : un mot plus large que la ligne
+            // (grande taille de texte, mot long) doit se replier, pas déborder.
+            let size = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
             if x + size.width > maxWidth, x > 0 {
                 usedWidth = max(usedWidth, x - spacing)
                 x = 0
@@ -93,14 +95,16 @@ struct WrappingHStack: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var x = bounds.minX, y = bounds.minY, lineHeight: CGFloat = 0
+        let lineWidth = bounds.width
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size = subview.sizeThatFits(ProposedViewSize(width: lineWidth, height: nil))
             if x + size.width > bounds.maxX, x > bounds.minX {
                 x = bounds.minX
                 y += lineHeight + lineSpacing
                 lineHeight = 0
             }
-            subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            subview.place(at: CGPoint(x: x, y: y),
+                          proposal: ProposedViewSize(width: min(size.width, lineWidth), height: size.height))
             x += size.width + spacing
             lineHeight = max(lineHeight, size.height)
         }

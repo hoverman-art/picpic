@@ -18,6 +18,10 @@ struct PremiumFeature: Identifiable {
     var requiresPro: Bool = false
 
     static let all: [PremiumFeature] = [
+        // En tête : c'est la fonction qui n'existe nulle part ailleurs.
+        PremiumFeature(id: "sudoc", title: "Ma filière à la BU",
+                       subtitle: "Le rayon d'à côté, par sujet",
+                       symbol: "building.columns.fill", tint: Theme.teal),
         PremiumFeature(id: "shelfscan", title: "Scan d'étagère",
                        subtitle: "Toute une étagère en une photo",
                        symbol: "camera.metering.matrix", tint: Theme.accent,
@@ -31,6 +35,12 @@ struct PremiumFeature: Identifiable {
         PremiumFeature(id: "availability", title: "Dispo autour de moi",
                        subtitle: "BU, médiathèques, librairies",
                        symbol: "location.fill", tint: Theme.teal),
+        PremiumFeature(id: "quotes", title: "Citations",
+                       subtitle: "Photographie, garde, partage",
+                       symbol: "text.quote", tint: Theme.gold),
+        PremiumFeature(id: "goals", title: "Objectifs & séries",
+                       subtitle: "Ton année, jour après jour",
+                       symbol: "flame.fill", tint: Theme.accent),
         PremiumFeature(id: "stats", title: "Ta rétrospective",
                        subtitle: "Ton année lecture, en chiffres",
                        symbol: "chart.bar.fill", tint: .purple,

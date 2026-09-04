@@ -15,6 +15,7 @@ struct FreeReadingSection: View {
 
     @State private var match: FreeReadingMatch?
     @State private var audiobookToPlay: FreeAudiobook?
+    @State private var ebookToRead: FreeEbook?
 
     var body: some View {
         Group {
@@ -26,10 +27,10 @@ struct FreeReadingSection: View {
 
                     if let ebook = match.ebook {
                         row(symbol: "book.fill",
-                            title: "Lire l'EPUB gratuit",
+                            title: "Lire dans Picpic",
                             detail: "Domaine public · \(ebook.source.rawValue)",
                             identifier: "freereading.ebook") {
-                            openLink(ebook.epubURL)
+                            ebookToRead = ebook
                         }
                     }
                     if let audiobook = match.audiobook {
@@ -49,6 +50,11 @@ struct FreeReadingSection: View {
         }
         .sheet(item: $audiobookToPlay) { audiobook in
             AudioPlayerView(audiobook: audiobook)
+        }
+        .fullScreenCover(item: $ebookToRead) { ebook in
+            EPUBReaderView(epubURL: ebook.epubURL,
+                           fallbackTitle: book.title,
+                           progressKey: book.isbn)
         }
     }
 

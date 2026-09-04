@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import SafariServices
 
 /// Identifiable wrapper for `.sheet(item:)` — avoids a retroactive
@@ -18,11 +19,23 @@ private struct SafariLink: Identifiable {
 }
 
 struct BookDetailView: View {
+    @Environment(ReadingGoalStore.self) private var goals
     @Bindable var book: Book
 
     @State private var holdings: [HoldingLibrary] = []
     @State private var holdingsLoaded = false
     @State private var safariLink: SafariLink?
+    @State private var showQuoteCapture = false
+    @State private var showRevision = false
+    @State private var showPaywall = false
+    @Environment(ProStore.self) private var proStore
+    @Environment(RevisionSheetStore.self) private var revisionStore
+    @Query(sort: \Quote.dateAdded, order: .reverse) private var allQuotes: [Quote]
+
+    /// Les citations relevées dans ce livre.
+    private var quotes: [Quote] {
+        allQuotes.filter { $0.bookISBN == book.isbn }
+    }
 
     var body: some View {
         ScrollView {
@@ -35,6 +48,9 @@ struct BookDetailView: View {
                 FreeReadingSection(book: book) { url in
                     safariLink = SafariLink(url: url)
                 }
+                personalSection
+                quotesSection
+                revisionButton
                 availabilitySection
                 if !book.subjects.isEmpty {
                     subjectsSection
@@ -49,6 +65,15 @@ struct BookDetailView: View {
         .sheet(item: $safariLink) { link in
             SafariView(url: link.url)
                 .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showQuoteCapture) {
+            QuoteCaptureView(book: book)
+        }
+        .sheet(isPresented: $showRevision) {
+            RevisionSheetView(book: book)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
         }
     }
 
@@ -101,13 +126,166 @@ struct BookDetailView: View {
     private var statusPicker: some View {
         Picker("Statut", selection: Binding(
             get: { book.status },
-            set: { book.status = $0 }
+            set: { newStatus in
+                book.status = newStatus
+                // Faire avancer un livre compte comme avoir lu aujourd'hui.
+                if newStatus == .reading || newStatus == .finished {
+                    goals.recordActivity()
+                }
+            }
         )) {
             ForEach(ReadingStatus.allCases) { status in
                 Label(status.label, systemImage: status.symbol).tag(status)
             }
         }
         .pickerStyle(.segmented)
+    }
+
+    /// Ce que le lecteur ajoute lui-même : sa note et ses remarques. C'est
+    /// aussi la matière première de la fiche de révision.
+    private var personalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Mon avis")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+
+            HStack(spacing: 6) {
+                ForEach(1...5, id: \.self) { star in
+                    Button {
+                        // Retoucher l'étoile courante retire la note.
+                        book.rating = (book.rating == star) ? nil : star
+                        goals.recordActivity()
+                    } label: {
+                        Image(systemName: (book.rating ?? 0) >= star ? "star.fill" : "star")
+                            .font(.title3)
+                            .foregroundStyle((book.rating ?? 0) >= star ? Theme.gold : Color.secondary.opacity(0.4))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
+                    .accessibilityIdentifier("book.star.\(star)")
+                }
+                Spacer(minLength: 0)
+                if book.rating != nil {
+                    Button("Effacer") { book.rating = nil }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Mes notes")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                TextEditor(text: $book.notes)
+                    .font(.callout)
+                    .frame(minHeight: 90)
+                    .padding(8)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(alignment: .topLeading) {
+                        if book.notes.isEmpty {
+                            Text("Ce que tu veux retenir…")
+                                .font(.callout)
+                                .foregroundStyle(.tertiary)
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 16)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityIdentifier("book.notes")
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.6), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    /// Fiche de révision : 3 livres par mois en gratuit, illimité en Pro.
+    private var revisionButton: some View {
+        Button {
+            if revisionStore.canOpen(isbn: book.isbn, isPro: proStore.isPro) {
+                revisionStore.recordOpen(isbn: book.isbn, isPro: proStore.isPro)
+                showRevision = true
+            } else {
+                showPaywall = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "rectangle.and.pencil.and.ellipsis")
+                    .font(.title3)
+                    .foregroundStyle(Theme.lavender)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Fiche de révision")
+                        .font(.headline)
+                        .foregroundStyle(Theme.ink)
+                    Text(revisionSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityIdentifier("book.revision")
+    }
+
+    private var revisionSubtitle: String {
+        if proStore.isPro { return "Tes notes et tes citations, en mode révision" }
+        if revisionStore.canOpen(isbn: book.isbn, isPro: false) {
+            let left = revisionStore.remainingThisMonth
+            return "Tes notes et tes citations · \(left) livre\(left > 1 ? "s" : "") ce mois-ci"
+        }
+        return "Quota du mois atteint — passe à Picpic Pro"
+    }
+
+    private var quotesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Citations")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                Button {
+                    showQuoteCapture = true
+                } label: {
+                    Label("Capturer", systemImage: "text.viewfinder")
+                        .font(.footnote.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Theme.gold.opacity(0.18), in: Capsule())
+                        .foregroundStyle(Theme.ink)
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityIdentifier("book.captureQuote")
+            }
+
+            if quotes.isEmpty {
+                Text("Une phrase t'a marqué ? Photographie la page, Picpic en extrait le texte.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(quotes) { quote in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("« \(quote.text) »")
+                            .font(.callout)
+                            .italic()
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(4)
+                        if let page = quote.page {
+                            Text("page \(page)")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            }
+        }
     }
 
     private func summarySection(_ text: String) -> some View {

@@ -38,22 +38,82 @@ Décision : **aucune tuile « Bientôt » dans l'app soumise** — tout ce qui e
 3. Retrait des teasers (fiches de révision, widgets, streaks, citations, mode étudiant,
    sync) de la grille et du paywall → backlog ci-dessous.
 
-## Backlog V1.3+ (rien n'est promis dans l'app)
+## V1.3 « Le campus » — ✅ livrée (04/09/2026)
 
-- Fiches de révision on-device (gratuit : 3/mois) — prudence juridique (Koober c. Eyrolles)
-- Widgets + Live Activity de session de lecture
+Menée par le Sudoc, comme demandé : la recherche par sujet dans le fonds d'une BU
+n'existe dans aucune autre app de lecture.
+
+1. **Ma filière à la BU** (gratuit, mis en avant sur l'accueil) — recherche thématique
+   dans le SRU du Sudoc (`msu`/`mti`/`aut`), restreinte au fonds d'une bibliothèque
+   par l'index `rbc` (RCR **173002101** = LA ROCHELLE-BU), filtres année/langue,
+   pagination, ajout d'une notice à la bibliothèque en un geste, exemplaires par PPN.
+   48 vedettes-matière Rameau câblées sur les 8 filières, toutes vérifiées contre le
+   fonds réel (aucune ne renvoie moins de 50 notices).
+2. **Objectifs & séries** (gratuit) — objectif annuel, série de jours, bandeau d'accueil.
+   A nécessité `Book.dateFinished` (migration légère, optionnelle).
+3. **Citations OCR & quote cards** (gratuit) — photo d'une page → lignes reconnues →
+   sélection → citation gardée ; carte partageable en trois palettes (ImageRenderer).
+   La photo n'est jamais conservée.
+4. **Fiches de révision** (3 livres/mois gratuit, illimité en Pro) — construites depuis
+   **le matériau de l'utilisateur** (ses notes, ses citations) et les faits
+   bibliographiques, jamais un résumé de l'œuvre (prudence Koober). Mode « me tester »
+   à rappel actif.
+5. **Notes et étoiles enfin éditables** — elles étaient stockées dans le modèle mais
+   sans aucune interface, alors que la fiche App Store les promettait.
+6. **Liseuse intégrée** (gratuit) — les EPUB du domaine public se lisent **dans**
+   Picpic, plus dans Safari : lecteur ZIP et analyseur EPUB écrits à la main (zéro
+   dépendance), thèmes papier/sépia/nuit, serif ou sans, taille et interligne réglables,
+   table des matières avec vrais titres de chapitres, reprise à la page, cache disque
+   (un livre ouvert se relit hors connexion). Images de l'archive intégrées en `data:`,
+   sans quoi les couvertures s'affichaient blanches.
+
+7. **Lecture à voix haute** (gratuit) — n'importe quel livre de la liseuse se fait lire
+   sur l'appareil, paragraphe par paragraphe : surlignage de ce qu'on entend, défilement
+   suivi, pause/paragraphe précédent-suivant, enchaînement des chapitres, commandes sur
+   l'écran verrouillé, choix de la voix (classée par qualité, avec extrait) et du débit.
+   **Limite Apple à connaître** : les voix « Améliorée » et « Premium » ne sont pas
+   installées par défaut et aucune API ne permet à une app de les installer ou de les
+   embarquer — Picpic prend donc la meilleure voix présente et dit où ajouter les autres.
+   Détail et solution de repli dans docs/LECTURE-VOIX-HAUTE.md.
+
+### Correctifs de la même livraison
+
+- **Apparence verrouillée en clair** (`INFOPLIST_KEY_UIUserInterfaceStyle = Light`) : le
+  thème « encre & papier » code 36 fonds blancs en dur ; en mode sombre les textes
+  système passaient en blanc sur blanc.
+- **Grandes tailles de texte** : les pages d'onboarding et de tutoriel étaient calées
+  entre deux `Spacer` dans un écran de hauteur fixe — SwiftUI comprimait alors les
+  `Text` jusqu'à les tronquer (« Dispo en bib… ») ou à les faire se chevaucher.
+  Nouveau `CenteredScrollPage` (centré tant que ça tient, défilant sinon, contenu en
+  `fixedSize`), `WrappingHStack` qui propose enfin la largeur disponible à ses éléments,
+  icônes en `minWidth` au lieu de `frame(width:)`, réserve du bouton Scanner en
+  `@ScaledMetric`, et plafond `dynamicTypeSize(...accessibility1)`.
+- **« Lire & écouter » qui tournait dans le vide** : l'endpoint `?search=` de Gutendex ne
+  répond plus (vérifié : 0 réponse en 12 s, alors que le listing simple répond en 1,5 s),
+  et ses requêtes bloquées saturaient la file vers le même hôte — la sélection de
+  classiques, pourtant valide, expirait derrière elles. Budget de 6 s sur cet appel avec
+  repli Wikisource, délais de session ramenés de 25 s à 10 s, 6 connexions par hôte.
+- **Notes et étoiles enfin éditables** (voir point 5) — la fiche App Store les promettait.
+
+## Backlog V1.4+ (rien n'est promis dans l'app)
+
+- **Widgets + Live Activity** — demande une cible d'extension WidgetKit et un App Group
+  (donc App ID + provisioning à retoucher sur une app déjà en ligne). À faire à froid.
+- **Sync iCloud (CloudKit)** — SwiftData+CloudKit interdit les contraintes `.unique` :
+  il faudrait retirer `@Attribute(.unique)` de `Book.isbn` et migrer les bibliothèques
+  existantes. Risque de perte de données, à traiter comme un chantier à part.
 - Import Goodreads/StoryGraph CSV — toujours gratuit (canal d'acquisition n°1)
-- Objectifs/streaks, citations OCR + quote cards
 - Fiabiliser les métadonnées (croiser GB + OL + Inventaire.io)
+- Annuaire des RCR : élargir le filtre `rbc` à d'autres villes (une BU = un RCR)
 
-Gratuit non négociable : scan illimité, livres illimités, import/export CSV, lecture domaine public.
+Gratuit non négociable : scan illimité, livres illimités, import/export CSV,
+lecture domaine public, recherche Sudoc.
 
-## « Le campus » — cible janvier 2027
+## « Le campus » — suite (cible janvier 2027)
 
-- Mode étudiant complet : reco par filière, recherche Sudoc thématique
-- Objectifs/streaks + gel de série, citations OCR + quote cards
-- Annuaire bibliothèques FR (data.culture.gouv.fr) avec géoloc
-- Campagne campus La Rochelle (BU des Minimes, BDE)
+- Annuaire bibliothèques FR (data.culture.gouv.fr) avec géoloc, au-delà du Sudoc
+- Gel de série (un jour de rattrapage), objectifs par mois
+- Campagne campus La Rochelle (BU des Minimes, BDE) — la V1.3 en est le produit d'appel
 
 ## V2 « Partout en France » — 2027
 

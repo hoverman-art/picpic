@@ -47,6 +47,11 @@ final class Book {
     var language: String?
     var dateAdded: Date
     var statusRaw: String
+    /// Date de passage au statut « terminé ». Nécessaire à l'objectif annuel :
+    /// `dateAdded` dit quand le livre est entré dans la bibliothèque, pas quand
+    /// il a été lu. Optionnelle, donc migration légère pour les bibliothèques
+    /// existantes (les livres déjà terminés restent sans date).
+    var dateFinished: Date?
     var rating: Int?
     var notes: String
     /// Embedding vector (Float32 array encoded as Data) for on-device semantic search.
@@ -54,7 +59,12 @@ final class Book {
 
     var status: ReadingStatus {
         get { ReadingStatus(rawValue: statusRaw) ?? .toRead }
-        set { statusRaw = newValue.rawValue }
+        set {
+            statusRaw = newValue.rawValue
+            // Repasser un livre en cours annule sa date de fin : sinon il
+            // compterait deux fois dans l'objectif annuel une fois reterminé.
+            dateFinished = newValue == .finished ? (dateFinished ?? .now) : nil
+        }
     }
 
     var coverURL: URL? {
@@ -99,6 +109,7 @@ final class Book {
         self.language = language
         self.dateAdded = dateAdded
         self.statusRaw = status.rawValue
+        self.dateFinished = status == .finished ? dateAdded : nil
         self.rating = nil
         self.notes = ""
         self.embedding = nil

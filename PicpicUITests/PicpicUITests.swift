@@ -16,7 +16,9 @@ final class PicpicUITests: XCTestCase {
     }
 
     private func launchApp(onboardingDone: Bool, resetBooks: Bool = false, pro: Bool = false,
-                           freeReadingStub: Bool = false) -> XCUIApplication {
+                           freeReadingStub: Bool = false,
+                           sudocStub: Bool = false,
+                           demoBooks: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-onboarding.done", onboardingDone ? "YES" : "NO"]
         app.launchArguments += ["-stats.scanCount", "0"]
@@ -28,6 +30,12 @@ final class PicpicUITests: XCTestCase {
         }
         if freeReadingStub {
             app.launchArguments += ["-uitest-freereading-stub"]
+        }
+        if sudocStub {
+            app.launchArguments += ["-uitest-sudoc-stub"]
+        }
+        if demoBooks {
+            app.launchArguments += ["-uitest-demo-books"]
         }
         app.launch()
         return app
@@ -271,5 +279,134 @@ final class PicpicUITests: XCTestCase {
                       "L'état vide de la rétrospective doit s'afficher sans livres")
         app.buttons["Fermer"].tap()
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 3))
+    }
+
+    // MARK: - Feature 13 : Sudoc — la recherche par sujet dans le fonds d'une BU
+
+    @MainActor
+    func testSudocSearchFromCampusCard() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true, sudocStub: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        let card = app.buttons["home.campusCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: 3), "La carte Sudoc doit être en tête d'accueil")
+        card.tap()
+
+        XCTAssertTrue(app.textFields["sudoc.searchField"].waitForExistence(timeout: 4),
+                      "L'écran Sudoc doit s'ouvrir")
+        XCTAssertTrue(app.buttons["sudoc.scope"].firstMatch.exists || app.segmentedControls.firstMatch.exists,
+                      "Le sélecteur BU/France doit être présent")
+
+        // Une puce de sujet lance la recherche.
+        let chip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sudoc.chip.'")).firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 3), "Les sujets proposés doivent s'afficher")
+        chip.tap()
+
+        XCTAssertTrue(app.staticTexts["Les data contre la liberté"].waitForExistence(timeout: 6),
+                      "Les notices doivent s'afficher")
+        XCTAssertTrue(app.staticTexts["sudoc.summary"].exists || app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'notices'")).firstMatch.exists,
+                      "Le total de notices doit être annoncé")
+    }
+
+    @MainActor
+    func testSudocRecordDetailShowsSubjects() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true, sudocStub: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.buttons["home.campusCard"].tap()
+        let chip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sudoc.chip.'")).firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 4))
+        chip.tap()
+
+        let row = app.buttons["sudoc.row"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 6), "Une ligne de résultat doit être touchable")
+        row.tap()
+        XCTAssertTrue(app.staticTexts["Sujets"].waitForExistence(timeout: 4),
+                      "Le détail d'une notice doit lister ses sujets")
+        XCTAssertTrue(app.staticTexts["Où l'emprunter"].exists,
+                      "Le détail doit annoncer les exemplaires")
+    }
+
+    // MARK: - Feature 14 : Objectifs & série de lecture
+
+    @MainActor
+    func testGoalsOpenFromStrip() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        let strip = app.buttons["home.goalStrip"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 3), "Le bandeau objectif doit être sur l'accueil")
+        strip.tap()
+
+        XCTAssertTrue(app.navigationBars["Mon année"].waitForExistence(timeout: 4),
+                      "L'écran objectifs doit s'ouvrir")
+        XCTAssertTrue(app.otherElements["goals.streak"].waitForExistence(timeout: 3),
+                      "La série doit être affichée")
+        XCTAssertTrue(app.staticTexts["Terminés cette année"].exists)
+    }
+
+    // MARK: - Feature 15 : Citations
+
+    @MainActor
+    func testWriteAndKeepAQuote() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        let tile = app.buttons.containing(.staticText, identifier: "Citations").firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 3), "La tuile Citations doit exister")
+        tile.tap()
+
+        XCTAssertTrue(app.navigationBars["Mes citations"].waitForExistence(timeout: 4))
+        app.buttons["quotes.add"].tap()
+
+        let manual = app.buttons["quote.manual"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 4), "L'écriture à la main doit être proposée")
+        manual.tap()
+
+        let editor = app.textViews["quote.editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 4))
+        editor.tap()
+        editor.typeText("La vie est ce qui arrive pendant que tu fais des projets.")
+
+        app.buttons["quote.save"].tap()
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'La vie est ce qui arrive'")).firstMatch
+            .waitForExistence(timeout: 4),
+                      "La citation gardée doit apparaître dans le carnet")
+    }
+
+    // MARK: - Feature 16 : Notes, étoiles et fiche de révision
+
+    @MainActor
+    func testNotesRatingAndRevisionSheet() throws {
+        let app = launchApp(onboardingDone: true, demoBooks: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        app.staticTexts["L'Étranger"].firstMatch.tap()
+
+        // Une étoile : la note doit être modifiable, ce que la fiche App Store promet.
+        let fourth = app.buttons["book.star.4"]
+        XCTAssertTrue(fourth.waitForExistence(timeout: 4), "Les étoiles doivent être touchables")
+        fourth.tap()
+
+        let notes = app.textViews["book.notes"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 3), "Les notes doivent être éditables")
+        notes.tap()
+        notes.typeText("L'absurde ne mène pas au désespoir")
+
+        let revision = app.buttons["book.revision"]
+        XCTAssertTrue(revision.waitForExistence(timeout: 3))
+        revision.tap()
+
+        XCTAssertTrue(app.navigationBars["Fiche de révision"].waitForExistence(timeout: 4),
+                      "La fiche de révision doit s'ouvrir")
+        XCTAssertTrue(app.staticTexts["Tes notes"].waitForExistence(timeout: 3),
+                      "La fiche reprend les notes de l'utilisateur")
+        // Le mode révision masque le texte jusqu'au rappel.
+        app.buttons["revision.toggleTest"].tap()
+        XCTAssertFalse(app.staticTexts["L'absurde ne mène pas au désespoir"].exists,
+                       "En mode test, la note doit être masquée")
     }
 }

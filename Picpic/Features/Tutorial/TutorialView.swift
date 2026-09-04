@@ -80,10 +80,9 @@ struct TutorialView: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
 
-                Spacer()
-
                 let step = steps[index]
-                VStack(spacing: 22) {
+                CenteredScrollPage {
+                  VStack(spacing: 22) {
                     MascotView(pose: step.pose, height: 190)
                         .staggeredAppear(index: 0, isVisible: stepVisible)
                     AnimatedText(text: step.title, isVisible: stepVisible, font: .display(28))
@@ -101,13 +100,13 @@ struct TutorialView: View {
                             .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .staggeredAppear(index: 5, isVisible: stepVisible)
                     }
+                  }
+                  .padding(.horizontal, 28)
+                  .padding(.vertical, 24)
+                  .id(index)
+                  .transition(.blurSlide())
                 }
-                .padding(.horizontal, 28)
-                .id(index)
-                .transition(.blurSlide())
-
-                Spacer()
-                Spacer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 Button {
                     advance()
