@@ -23,6 +23,7 @@ struct NarratorVoice: Identifiable, Hashable {
     let quality: AVSpeechSynthesisVoiceQuality
 
     var qualityLabel: String {
+        if isNovelty { return "Classique" }
         switch quality {
         case .premium: return "Premium"
         case .enhanced: return "Améliorée"
@@ -31,7 +32,7 @@ struct NarratorVoice: Identifiable, Hashable {
     }
 
     /// Les voix Premium et Améliorées sont nettement plus naturelles ; c'est
-    /// le critère de tri de la liste.
+    /// le premier critère de tri.
     var qualityRank: Int {
         switch quality {
         case .premium: return 2
@@ -41,6 +42,29 @@ struct NarratorVoice: Identifiable, Hashable {
     }
 
     var isHighQuality: Bool { qualityRank > 0 }
+
+    /// Voix Eloquence : la vieille synthèse à formants d'Apple (« Grandma »,
+    /// « Rocko »…). Le système les annonce à la même qualité que les autres,
+    /// mais elles sont inécoutables sur la longueur d'un roman.
+    var isNovelty: Bool { id.contains(".eloquence.") }
+
+    /// Variante la plus légère, au rendu le plus métallique.
+    var isSuperCompact: Bool { id.contains(".super-compact.") }
+
+    /// Ordre de préférence pour la lecture d'un livre, du meilleur au pire.
+    /// Explicite à dessein : à qualité déclarée égale — le cas courant, car
+    /// aucune voix « Améliorée » n'est installée par défaut — trier seulement
+    /// par qualité revient à s'en remettre à l'ordre de la liste système.
+    static func preferred(_ a: NarratorVoice, _ b: NarratorVoice,
+                          preferredLanguage: String) -> Bool {
+        if a.qualityRank != b.qualityRank { return a.qualityRank > b.qualityRank }
+        if a.isNovelty != b.isNovelty { return !a.isNovelty }
+        let aExact = a.language.caseInsensitiveCompare(preferredLanguage) == .orderedSame
+        let bExact = b.language.caseInsensitiveCompare(preferredLanguage) == .orderedSame
+        if aExact != bExact { return aExact }
+        if a.isSuperCompact != b.isSuperCompact { return !a.isSuperCompact }
+        return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+    }
 }
 
 @Observable
@@ -49,18 +73,15 @@ final class ReadAloudController: NSObject {
 
     /// Voix installées, meilleures d'abord, pour la langue du livre puis les
     /// autres variantes de la même langue (fr-CA après fr-FR, par exemple).
-    static func availableVoices(matching languagePrefix: String = "fr") -> [NarratorVoice] {
+    static func availableVoices(matching languagePrefix: String = "fr",
+                                preferredLanguage: String = "fr-FR") -> [NarratorVoice] {
         AVSpeechSynthesisVoice.speechVoices()
             .filter { $0.language.hasPrefix(languagePrefix) }
             .map {
                 NarratorVoice(id: $0.identifier, name: $0.name,
                               language: $0.language, quality: $0.quality)
             }
-            .sorted {
-                $0.qualityRank != $1.qualityRank
-                    ? $0.qualityRank > $1.qualityRank
-                    : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-            }
+            .sorted { NarratorVoice.preferred($0, $1, preferredLanguage: preferredLanguage) }
     }
 
     /// Vrai si l'appareil ne propose que des voix standard : la liseuse le dit

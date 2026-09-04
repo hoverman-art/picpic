@@ -154,11 +154,15 @@ final class ReaderSettings {
         return bestAvailableVoice()
     }
 
+    /// La meilleure voix installée pour lire un livre, selon le classement de
+    /// `NarratorVoice.preferred` — et non le seul palier de qualité, qui laisse
+    /// presque toujours toutes les voix à égalité.
     func bestAvailableVoice(language: String = "fr") -> AVSpeechSynthesisVoice? {
-        let best = AVSpeechSynthesisVoice.speechVoices()
-            .filter { $0.language.hasPrefix(language) }
-            .max { $0.quality.rawValue < $1.quality.rawValue }
-        return best ?? AVSpeechSynthesisVoice(language: "fr-FR")
+        guard let best = ReadAloudController.availableVoices(matching: language).first,
+              let voice = AVSpeechSynthesisVoice(identifier: best.id) else {
+            return AVSpeechSynthesisVoice(language: "fr-FR")
+        }
+        return voice
     }
 
     // MARK: - Progression
