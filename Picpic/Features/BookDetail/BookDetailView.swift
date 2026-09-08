@@ -343,27 +343,10 @@ struct BookDetailView: View {
     @ViewBuilder
     private var sudocSection: some View {
         if !holdings.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Dispo dans \(holdings.count) BU en France (Sudoc)", systemImage: "building.columns.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                ForEach(holdings.prefix(5)) { library in
-                    HStack {
-                        Text(library.name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        Spacer()
-                        if let km = library.distanceFromLaRochelle {
-                            Text(km < 1 ? "ici" : "\(Int(km)) km")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(km < 20 ? Theme.teal : .secondary)
-                        }
-                    }
-                }
-            }
-            .padding(14)
-            .background(Theme.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            // Une carte plutôt qu'une liste : « LA ROCHELLE-BU » ne dit rien,
+            // un point sur une carte répond tout de suite à « est-ce près de
+            // moi ? ». Toucher une ligne recentre la carte sur l'établissement.
+            HoldingsMapView(holdings: holdings)
         } else if !holdingsLoaded {
             HStack(spacing: 8) {
                 ProgressView()

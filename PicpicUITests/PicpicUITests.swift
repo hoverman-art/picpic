@@ -41,6 +41,23 @@ final class PicpicUITests: XCTestCase {
         return app
     }
 
+    /// Fait défiler jusqu'à ce que l'élément soit réellement tapable.
+    ///
+    /// `exists` ne suffit pas : une vue hors de l'écran existe dans l'arbre
+    /// d'accessibilité, et la taper ne déclenche rien. Depuis que l'étagère est
+    /// remontée sous la recherche, le bandeau objectif passe sous la ligne de
+    /// flottaison sur les petits écrans.
+    private func scrollToTap(_ element: XCUIElement, in app: XCUIApplication,
+                             swipes: Int = 4, file: StaticString = #filePath, line: UInt = #line) {
+        var remaining = swipes
+        while !element.isHittable && remaining > 0 {
+            app.swipeUp()
+            remaining -= 1
+        }
+        XCTAssertTrue(element.isHittable, "Élément inaccessible après défilement", file: file, line: line)
+        element.tap()
+    }
+
     // MARK: - Feature 1 : Onboarding complet
 
     @MainActor
@@ -337,7 +354,7 @@ final class PicpicUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
         let strip = app.buttons["home.goalStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 3), "Le bandeau objectif doit être sur l'accueil")
-        strip.tap()
+        scrollToTap(strip, in: app)
 
         XCTAssertTrue(app.navigationBars["Mon année"].waitForExistence(timeout: 4),
                       "L'écran objectifs doit s'ouvrir")

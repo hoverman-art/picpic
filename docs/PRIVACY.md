@@ -1,6 +1,6 @@
 # Politique de confidentialité — Picpic
 
-*Dernière mise à jour : 31 août 2026*
+*Dernière mise à jour : 6 septembre 2026*
 
 ## L'essentiel
 
@@ -9,7 +9,8 @@ Picpic n'a pas de serveurs. Ta bibliothèque, tes notes, ton profil de lecture :
 ## Ce que Picpic ne collecte pas
 
 - Aucune donnée de ta bibliothèque (livres, statuts de lecture, notes, étoiles) ne quitte ton appareil vers nos systèmes — nous n'en avons pas.
-- Aucune donnée de localisation n'est collectée : la « disponibilité autour de toi » utilise des liens vers des services publics (Sudoc, catalogues de bibliothèques), ouverts dans Safari.
+- Aucune donnée de localisation n'est collectée. La carte des bibliothèques qui possèdent un livre affiche les coordonnées publiques renvoyées par le Sudoc : Picpic ne demande jamais ta position, et l'app n'a aucune autorisation de localisation.
+- Rien de ce que tu demandes à l'assistant de lecture ne quitte ton iPhone. Il s'appuie sur le modèle embarqué d'Apple Intelligence : ta question et ta bibliothèque sont traitées sur l'appareil, sans aucun appel réseau.
 - Aucun identifiant publicitaire n'est utilisé.
 
 ## Requêtes réseau nécessaires au fonctionnement

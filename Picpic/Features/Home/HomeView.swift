@@ -10,7 +10,10 @@ import SwiftUI
 import SwiftData
 
 private enum HomeSheet: String, Identifiable {
-    case paywall, shelfScan, freeLibrary, stats, sudoc, goals, quotes
+    case paywall, shelfScan, freeLibrary, stats, sudoc, goals, quotes, assistant
+    /// `import` est un mot réservé : la valeur brute garde le nom court, qui
+    /// sert d'argument de lancement aux tests UI et aux captures.
+    case importLibrary = "import"
     /// Ouverture directe de la liseuse — captures d'écran et vérification.
     case reader
 
@@ -30,6 +33,9 @@ struct HomeView: View {
     @State private var appeared = false
     @State private var navPath = NavigationPath()
     @State private var showScanFirstHint = false
+    /// Couvertures ou tranches. Conservé : c'est une préférence d'affichage,
+    /// pas un état de navigation, et la redemander à chaque lancement agace.
+    @AppStorage("home.shelfAsSpines") private var shelfAsSpines = false
     /// Les écrans de fonctionnalité passent par une seule feuille : empiler
     /// dix `.sheet` sur la même vue devient vite impossible à raisonner.
     @State private var sheet: HomeSheet?
@@ -52,18 +58,22 @@ struct HomeView: View {
                         .staggeredAppear(index: 0, isVisible: appeared)
                     searchBar
                         .staggeredAppear(index: 1, isVisible: appeared)
-                    campusCard
-                        .staggeredAppear(index: 2, isVisible: appeared)
-                    GoalStrip(books: books) { sheet = .goals }
-                        .staggeredAppear(index: 3, isVisible: appeared)
 
+                    // Ce qu'on ouvre l'application pour voir arrive en premier :
+                    // l'étagère est passée juste sous la recherche, et la carte
+                    // BU, la série et la bannière Pro sont descendues sous elle.
                     if books.isEmpty {
                         emptyState
-                            .staggeredAppear(index: 4, isVisible: appeared)
+                            .staggeredAppear(index: 2, isVisible: appeared)
                     } else {
                         bookShelf
-                            .staggeredAppear(index: 4, isVisible: appeared)
+                            .staggeredAppear(index: 2, isVisible: appeared)
                     }
+
+                    campusCard
+                        .staggeredAppear(index: 3, isVisible: appeared)
+                    GoalStrip(books: books) { sheet = .goals }
+                        .staggeredAppear(index: 4, isVisible: appeared)
 
                     if !proStore.isPro {
                         proBanner
@@ -105,6 +115,8 @@ struct HomeView: View {
                 case .sudoc: SudocSearchView()
                 case .goals: GoalsView()
                 case .quotes: QuotesView()
+                case .assistant: AssistantView()
+                case .importLibrary: ImportView()
                 case .reader:
                     EPUBReaderView(
                         epubURL: URL(string: "https://www.gutenberg.org/ebooks/62215.epub3.images")!,
@@ -145,6 +157,8 @@ struct HomeView: View {
                 case "sudoc": sheet = .sudoc
                 case "goals": sheet = .goals
                 case "quotes": sheet = .quotes
+                case "assistant": sheet = .assistant
+                case "import": sheet = .importLibrary
                 case "tutorial": showTutorial = true
                 case "reader": sheet = .reader
                 case "bookdetail":
@@ -255,6 +269,19 @@ struct HomeView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            // Le lecteur qui vient de Goodreads ou de Babelio a deux cents
+            // livres à reprendre : lui proposer de scanner le premier, c'est
+            // lui demander de recommencer sa bibliothèque à la main.
+            Button {
+                sheet = .importLibrary
+            } label: {
+                Label("J'ai déjà une bibliothèque ailleurs", systemImage: "square.and.arrow.down")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+            .accessibilityIdentifier("home.importFromEmpty")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 36)
@@ -271,6 +298,7 @@ struct HomeView: View {
                 Text("\(displayedBooks.count) livre\(displayedBooks.count > 1 ? "s" : "")")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                shelfStyleToggle
             }
             if displayedBooks.isEmpty {
                 Text("Aucun résultat — essaie une autre idée.")
@@ -278,18 +306,41 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(displayedBooks) { book in
-                        NavigationLink(value: book) {
-                            BookCard(book: book)
+            if shelfAsSpines {
+                SpineShelf(books: displayedBooks)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(displayedBooks) { book in
+                            NavigationLink(value: book) {
+                                BookCard(book: book)
+                            }
+                            .buttonStyle(PressableStyle())
                         }
-                        .buttonStyle(PressableStyle())
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
         }
+    }
+
+    /// Un seul bouton plutôt qu'un sélecteur segmenté : il n'y a que deux
+    /// modes, et l'icône montre celui vers lequel on bascule.
+    private var shelfStyleToggle: some View {
+        Button {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                shelfAsSpines.toggle()
+            }
+        } label: {
+            Image(systemName: shelfAsSpines ? "square.grid.2x2" : "books.vertical")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.ink.opacity(0.55))
+                .padding(6)
+                .background(Theme.ink.opacity(0.06), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("home.shelfStyle")
+        .accessibilityLabel(shelfAsSpines ? "Afficher les couvertures" : "Afficher les tranches")
     }
 
     private var proBanner: some View {
@@ -359,6 +410,12 @@ struct HomeView: View {
             return { sheet = .goals }
         case "quotes":
             return { sheet = .quotes }
+        case "assistant":
+            // Gratuite avec un quota, comme les fiches de révision : le Pro
+            // lève la limite, il ne déverrouille pas l'accès.
+            return { sheet = .assistant }
+        case "import":
+            return { sheet = .importLibrary }
         case "semantic":
             return { searchFocused = true }
         case "freereading":

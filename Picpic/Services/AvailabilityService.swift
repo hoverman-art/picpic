@@ -155,8 +155,14 @@ struct AvailabilityService {
             for lib in libs {
                 guard let rcr = stringValue(lib["rcr"]), let name = stringValue(lib["shortname"]) else { continue }
                 var coordinate: CLLocationCoordinate2D?
-                if let lat = doubleValue(lib["latitude"]), let lon = doubleValue(lib["longitude"]) {
-                    coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                if let lat = doubleValue(lib["latitude"]), let lon = doubleValue(lib["longitude"]),
+                   lat.isFinite, lon.isFinite, !(lat == 0 && lon == 0) {
+                    let c = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                    // Depuis que ces coordonnées alimentent une carte et non plus
+                    // un simple calcul de distance, elles doivent être valides :
+                    // MKCoordinateRegion asserte sur du NaN, et le Sudoc laisse
+                    // des RCR non géocodés à 0/0 — au milieu du golfe de Guinée.
+                    if CLLocationCoordinate2DIsValid(c) { coordinate = c }
                 }
                 libraries.append(HoldingLibrary(id: rcr, name: name, coordinate: coordinate))
             }

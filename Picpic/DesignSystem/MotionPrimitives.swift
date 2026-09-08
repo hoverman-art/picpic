@@ -90,7 +90,12 @@ struct WrappingHStack: Layout {
             lineHeight = max(lineHeight, size.height)
         }
         usedWidth = max(usedWidth, x - spacing)
-        return CGSize(width: max(usedWidth, 0), height: y + lineHeight)
+        // Rendre la largeur PROPOSÉE, pas la largeur utilisée. En annonçant sa
+        // ligne la plus longue (268 pt mesurés pour 346 proposés), la mise en
+        // page repliait les mots dans ces 268 pt à la pose : une ligne de plus
+        // que celles réservées, et le titre de l'onboarding se posait sur le
+        // paragraphe suivant. Mesuré le 8 septembre 2026.
+        return CGSize(width: proposal.width ?? max(usedWidth, 0), height: y + lineHeight)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {

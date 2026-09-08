@@ -13,6 +13,7 @@ struct PicpicApp: App {
     @State private var goals = ReadingGoalStore.shared
     @State private var revisionStore = RevisionSheetStore.shared
     @State private var readerSettings = ReaderSettings.shared
+    @State private var assistantStore = AssistantStore.shared
 
     init() {
         ProStore.configure()
@@ -26,6 +27,7 @@ struct PicpicApp: App {
                 .environment(goals)
                 .environment(revisionStore)
                 .environment(readerSettings)
+                .environment(assistantStore)
                 .animation(.easeInOut(duration: 0.5), value: settings.hasCompletedOnboarding)
                 .task { await proStore.observeCustomerInfo() }
                 .onAppear { goals.refreshStreak() }

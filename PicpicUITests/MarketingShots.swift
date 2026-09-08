@@ -18,10 +18,34 @@ final class MarketingShots: XCTestCase {
         continueAfterFailure = false
         // Ces cas produisent des visuels, ils ne valident rien — et ils
         // dépendent du Sudoc et de Gutenberg. Hors campagne de captures, ils
-        // n'ont rien à faire dans une suite de non-régression :
-        //   PICPIC_CAPTURE=1 xcodebuild test -only-testing:PicpicUITests/MarketingShots
+        // n'ont rien à faire dans une suite de non-régression.
+        //
+        // Le préfixe TEST_RUNNER_ est obligatoire : xcodebuild ne transmet pas
+        // l'environnement du shell au processus de test, il ne relaie que les
+        // variables ainsi préfixées. Sans lui les cas sont ignorés et la
+        // commande se termine au vert sans avoir produit une seule capture.
+        //   TEST_RUNNER_PICPIC_CAPTURE=1 xcodebuild test \
+        //     -only-testing:PicpicUITests/MarketingShots
         try XCTSkipUnless(ProcessInfo.processInfo.environment["PICPIC_CAPTURE"] == "1",
-                          "Captures marketing : régler PICPIC_CAPTURE=1 pour les produire.")
+                          "Captures marketing : régler TEST_RUNNER_PICPIC_CAPTURE=1 pour les produire.")
+    }
+
+    /// Laisse les vignettes de couverture arriver avant de déclencher la capture.
+    ///
+    /// Les jaquettes sont des `AsyncImage` qui partent sur covers.openlibrary.org,
+    /// lequel répond en 2 à 11 s. La branche `default:` de `BookCard` confond
+    /// « en cours » et « échec » et affiche le même aplat lavande, donc une
+    /// capture prise trop tôt montre six rectangles violets au lieu des livres —
+    /// et rien ne la distingue d'un échec réseau. Attendre l'apparition d'un
+    /// libellé ne suffit pas : le texte est rendu avant que l'image ne parte.
+    ///
+    /// Faute d'identifiant sur l'état chargé, on temporise. C'est grossier, mais
+    /// ça reste confiné à la cible de test : l'alternative propre — exposer
+    /// l'état `.success` de l'AsyncImage — ajouterait du code de capture à
+    /// l'app livrée, ce que ce fichier existe précisément pour éviter.
+    private func letCoversLoad(_ seconds: TimeInterval = 14) {
+        _ = XCTWaiter.wait(for: [expectation(description: "chargement des couvertures")],
+                           timeout: seconds)
     }
 
     private func app(_ extra: [String]) -> XCUIApplication {
@@ -50,6 +74,7 @@ final class MarketingShots: XCTestCase {
     func testCaptureHomeAndSudoc() throws {
         let app = app([])
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 8))
+        letCoversLoad()
         shoot(app, "home_full")
 
         app.buttons["home.campusCard"].tap()

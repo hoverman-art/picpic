@@ -3,3 +3,9 @@ xcuserdata/
 DerivedData/
 *.xcuserstate
 .DS_Store
+
+# Python
+__pycache__/
+
+# Sources brutes des visuels ASO (27 Mo d itérations, non nécessaires au dépôt)
+marketing/aso-source/

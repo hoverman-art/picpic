@@ -92,6 +92,9 @@ struct PaywallView: View {
             featureRow(symbol: "rectangle.and.pencil.and.ellipsis", tint: Theme.lavender,
                        title: "Fiches de révision illimitées",
                        detail: "Sans Pro : 3 livres par mois.")
+            featureRow(symbol: "sparkles", tint: Theme.lavender,
+                       title: "Assistant de lecture illimité",
+                       detail: "Sans Pro : 5 questions par jour.")
             featureRow(symbol: "chart.bar.fill", tint: .purple,
                        title: "Ta rétrospective lecture",
                        detail: "Ton année en chiffres, calculée sur ton iPhone.")

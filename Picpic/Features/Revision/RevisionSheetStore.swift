@@ -31,6 +31,11 @@ final class RevisionSheetStore {
         let defaults = UserDefaults.standard
         periodKey = defaults.string(forKey: "revision.period") ?? Self.currentPeriodKey()
         openedISBNs = defaults.stringArray(forKey: "revision.openedISBNs") ?? []
+        // Les observateurs de propriete ne se declenchent pas depuis un init :
+        // sans cette ecriture, la cle de periode n'existe jamais en base et le
+        // compteur ne retombe jamais a zero au changement de mois.
+        defaults.set(periodKey, forKey: "revision.period")
+        defaults.set(openedISBNs, forKey: "revision.openedISBNs")
         rolloverIfNeeded()
     }
 

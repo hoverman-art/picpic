@@ -27,7 +27,11 @@ struct ContentView: View {
                     try? modelContext.save()
                 }
                 // Bibliothèque de démonstration pour captures d'écran et previews.
-                if ProcessInfo.processInfo.arguments.contains("-uitest-demo-books") {
+                if ProcessInfo.processInfo.arguments.contains("-uitest-reset-assistant") {
+            UserDefaults.standard.removeObject(forKey: "assistant.askedToday")
+            UserDefaults.standard.removeObject(forKey: "assistant.period")
+        }
+        if ProcessInfo.processInfo.arguments.contains("-uitest-demo-books") {
                     try? modelContext.delete(model: Book.self)
                     for book in Self.demoBooks {
                         modelContext.insert(book)

@@ -63,11 +63,8 @@ struct TutorialView: View {
 
     var body: some View {
         ZStack {
-            OrganicBackground(
-                colors: Theme.onboardingGradients[index % Theme.onboardingGradients.count],
-                showWaves: true
-            )
-            .animation(.easeInOut(duration: 0.8), value: index)
+            PaperBackground(variation: index)
+                .animation(.easeInOut(duration: 0.8), value: index)
 
             VStack(spacing: 0) {
                 HStack {
@@ -75,7 +72,7 @@ struct TutorialView: View {
                     Spacer()
                     Button("Fermer") { dismiss() }
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Theme.ink.opacity(0.55))
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
@@ -85,19 +82,22 @@ struct TutorialView: View {
                   VStack(spacing: 22) {
                     MascotView(pose: step.pose, height: 190)
                         .staggeredAppear(index: 0, isVisible: stepVisible)
-                    AnimatedText(text: step.title, isVisible: stepVisible, font: .display(28))
+                    AnimatedText(text: step.title, isVisible: stepVisible, font: .display(28), color: Theme.ink)
                         .multilineTextAlignment(.center)
                     Text(step.text)
                         .font(.body)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(Theme.ink.opacity(0.7))
                         .multilineTextAlignment(.center)
                         .staggeredAppear(index: 3, isVisible: stepVisible)
                     if let tip = step.tip {
+                        // Un conseil n'est ni Pro, ni dehors, ni sur l'appareil :
+                        // il reste neutre. L'or est réservé à Picpic Pro.
                         Label(tip, systemImage: "lightbulb.fill")
                             .font(.footnote)
-                            .foregroundStyle(Theme.gold)
+                            .foregroundStyle(Theme.ink.opacity(0.75))
                             .padding(12)
-                            .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(.white, in: RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous))
+                            .shadow(color: Theme.ink.opacity(0.05), radius: 8, y: 3)
                             .staggeredAppear(index: 5, isVisible: stepVisible)
                     }
                   }
@@ -129,7 +129,7 @@ struct TutorialView: View {
         HStack(spacing: 8) {
             ForEach(0..<steps.count, id: \.self) { i in
                 Capsule()
-                    .fill(i == index ? Theme.accent : .white.opacity(0.3))
+                    .fill(i == index ? Theme.accent : Theme.ink.opacity(0.18))
                     .frame(width: i == index ? 24 : 8, height: 8)
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: index)
             }
