@@ -345,6 +345,31 @@ final class PicpicUITests: XCTestCase {
                       "Le détail doit annoncer les exemplaires")
     }
 
+    // MARK: - Feature 13 bis : la barre de recherche se valide et s'efface
+
+    /// Le champ filtrait à la frappe mais n'offrait aucun moyen de valider ni
+    /// de fermer le clavier : il passait pour cassé.
+    @MainActor
+    func testSearchCanBeSubmittedAndCleared() throws {
+        let app = launchApp(onboardingDone: true, demoBooks: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        let field = app.textFields["home.search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3), "La barre de recherche doit être sur l'accueil")
+        field.tap()
+        XCTAssertTrue(app.buttons["home.searchDone"].waitForExistence(timeout: 2),
+                      "Champ vide et actif : un bouton doit permettre de refermer le clavier")
+
+        field.typeText("mer")
+        let clear = app.buttons["home.searchClear"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 2), "Une croix doit permettre d'effacer la recherche")
+        clear.tap()
+
+        XCTAssertFalse(clear.exists, "La croix disparaît quand le champ est vide")
+        XCTAssertTrue(app.staticTexts["Mes scans"].waitForExistence(timeout: 3),
+                      "La bibliothèque complète revient après effacement")
+    }
+
     // MARK: - Feature 14 : Objectifs & série de lecture
 
     @MainActor

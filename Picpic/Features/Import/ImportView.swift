@@ -196,7 +196,7 @@ struct ImportView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Où trouver son export")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Theme.ink.opacity(0.55))
             detail("**Goodreads** : My Books → Import and export → Export Library.")
             detail("**Babelio** : Ma bibliothèque → Exporter.")
             detail("Un tableur convient aussi : il lui faut une colonne titre et une colonne ISBN.")

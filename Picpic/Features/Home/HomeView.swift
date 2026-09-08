@@ -86,6 +86,7 @@ struct HomeView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, scanButtonInset)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Theme.paper)
             .overlay(alignment: .bottom) { scanButton }
             .navigationDestination(for: Book.self) { book in
@@ -205,6 +206,10 @@ struct HomeView: View {
         return "Salut \(name)\(field) 👋"
     }
 
+    /// La recherche filtre à la frappe, mais rien ne le disait : sans touche
+    /// de validation ni bouton, le champ avait l'air cassé et le clavier ne
+    /// se fermait jamais. Trois ajouts : la touche « Rechercher » ferme le
+    /// clavier, une croix efface, et le défilement referme le clavier.
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "sparkle.magnifyingglass")
@@ -212,10 +217,33 @@ struct HomeView: View {
             TextField("Cherche par idée : « roman sur la mer »…", text: $searchText)
                 .autocorrectionDisabled()
                 .focused($searchFocused)
+                .submitLabel(.search)
+                .onSubmit { searchFocused = false }
+                .accessibilityIdentifier("home.search")
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    searchFocused = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Theme.ink.opacity(0.3))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("home.searchClear")
+                .accessibilityLabel("Effacer la recherche")
+            } else if searchFocused {
+                Button("OK") { searchFocused = false }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("home.searchDone")
+            }
         }
         .padding(14)
         .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: Theme.ink.opacity(0.06), radius: 10, y: 4)
+        .animation(.easeInOut(duration: 0.15), value: searchText.isEmpty)
+        .animation(.easeInOut(duration: 0.15), value: searchFocused)
     }
 
     /// Sudoc en tête d'accueil : la recherche par sujet dans le fonds d'une BU
@@ -441,6 +469,11 @@ struct HomeView: View {
         }
     }
 
+    /// Le bouton flotte au-dessus du contenu qui défile : il passait en encre
+    /// sur la bannière Pro, elle aussi en encre, et les deux se confondaient.
+    /// Le corail est la couleur de l'action dans le système (voir Theme) —
+    /// c'était sa place depuis le début, et il se détache du papier comme de
+    /// l'encre. Le liseré papier l'isole de ce qui passe dessous.
     private var scanButton: some View {
         Button {
             showScanner = true
@@ -453,12 +486,14 @@ struct HomeView: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 16)
-            .background(Theme.ink, in: Capsule())
+            .background(Theme.accent, in: Capsule())
+            .overlay(Capsule().stroke(Theme.paper, lineWidth: 3))
             .foregroundStyle(.white)
-            .shadow(color: Theme.ink.opacity(0.35), radius: 14, y: 6)
+            .shadow(color: Theme.ink.opacity(0.30), radius: 14, y: 6)
         }
         .buttonStyle(PressableStyle())
         .padding(.bottom, 12)
+        .accessibilityIdentifier("home.scan")
     }
 
     private var fetchingOverlay: some View {

@@ -123,7 +123,7 @@ struct GoalsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if goals.bestStreak > 0 {
-                    Text("Record : \(goals.bestStreak) jours")
+                    Text("Record : \(goals.bestStreak) jour\(goals.bestStreak > 1 ? "s" : "")")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

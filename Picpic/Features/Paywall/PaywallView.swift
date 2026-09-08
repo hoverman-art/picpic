@@ -84,21 +84,26 @@ struct PaywallView: View {
         .staggeredAppear(index: 0, isVisible: appeared)
     }
 
+    /// Toutes les lignes en or : c'est l'écran Pro, et l'or ne dit que ça
+    /// (voir Theme). Le corail y était pour la première ligne alors qu'il est
+    /// réservé à l'action, et `.purple` comme `.pink` n'appartenaient à aucune
+    /// palette — les mêmes teintes décoratives que l'audit a retirées des
+    /// tuiles de l'accueil.
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 14) {
-            featureRow(symbol: "camera.metering.matrix", tint: Theme.accent,
+            featureRow(symbol: "camera.metering.matrix", tint: Theme.gold,
                        title: "Scan d'étagère",
                        detail: "Toute une étagère cataloguée en une photo.")
-            featureRow(symbol: "rectangle.and.pencil.and.ellipsis", tint: Theme.lavender,
+            featureRow(symbol: "rectangle.and.pencil.and.ellipsis", tint: Theme.gold,
                        title: "Fiches de révision illimitées",
                        detail: "Sans Pro : 3 livres par mois.")
-            featureRow(symbol: "sparkles", tint: Theme.lavender,
+            featureRow(symbol: "sparkles", tint: Theme.gold,
                        title: "Assistant de lecture illimité",
                        detail: "Sans Pro : 5 questions par jour.")
-            featureRow(symbol: "chart.bar.fill", tint: .purple,
+            featureRow(symbol: "chart.bar.fill", tint: Theme.gold,
                        title: "Ta rétrospective lecture",
                        detail: "Ton année en chiffres, calculée sur ton iPhone.")
-            featureRow(symbol: "heart.fill", tint: .pink,
+            featureRow(symbol: "heart.fill", tint: Theme.gold,
                        title: "Tu soutiens un projet indépendant",
                        detail: "Sans pub, sans serveurs, sans revente de données.")
             Text("Tout ce qui sortira en Pro est inclus, sans payer plus.")
@@ -255,7 +260,9 @@ struct PaywallView: View {
         } label: {
             Image(systemName: "xmark.circle.fill")
                 .font(.title2)
-                .foregroundStyle(.secondary)
+                // `.secondary` reprenait la teinte système et sortait un rond
+                // bleu au milieu du papier.
+                .foregroundStyle(Theme.ink.opacity(0.35))
         }
         .padding(16)
         .accessibilityIdentifier("paywall.close")

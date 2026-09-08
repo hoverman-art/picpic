@@ -139,7 +139,9 @@ struct StatsView: View {
                      symbol: "checkmark.seal.fill", tint: Theme.teal)
             statTile(value: pagesRead > 0 ? "\(pagesRead)" : "—", label: "pages lues",
                      symbol: "book.pages.fill", tint: Theme.lavender)
-            statTile(value: averageRating.map { String(format: "%.1f ★", $0) } ?? "—",
+            // `String(format:)` ignore la locale et sortait « 4.5 » en
+            // français. `formatted` suit celle de l'application.
+            statTile(value: averageRating.map { "\($0.formatted(.number.precision(.fractionLength(1)))) ★" } ?? "—",
                      label: "note moyenne", symbol: "star.fill", tint: Theme.gold)
         }
     }
@@ -161,17 +163,35 @@ struct StatsView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
+    private var maxStatusCount: Int {
+        ReadingStatus.allCases
+            .map { status in books.filter { $0.status == status }.count }
+            .max() ?? 0
+    }
+
     private var statusChart: some View {
         card("Où en es-tu ?") {
             Chart(ReadingStatus.allCases) { status in
+                let count = books.filter { $0.status == status }.count
                 BarMark(
-                    x: .value("Livres", books.filter { $0.status == status }.count),
+                    x: .value("Livres", count),
                     y: .value("Statut", status.label)
                 )
                 .foregroundStyle(Theme.accent.gradient)
                 .cornerRadius(6)
+                .annotation(position: .trailing) {
+                    Text("\(count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.ink.opacity(0.55))
+                }
             }
-            .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
+            // Quatre barres et de petits nombres : l'axe gradué n'apportait
+            // rien et mentait — il s'arrêtait à 1 quand les barres allaient à
+            // 2, son dernier repère tombant hors du tracé. Le chiffre est
+            // maintenant écrit au bout de sa barre, et l'échelle garde un cran
+            // de marge pour qu'il y tienne.
+            .chartXAxis(.hidden)
+            .chartXScale(domain: 0...(max(1, maxStatusCount) + 1))
             .frame(height: 170)
         }
     }
