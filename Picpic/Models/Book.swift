@@ -39,6 +39,13 @@ final class Book {
     var title: String
     var authors: [String]
     var bookDescription: String?
+    /// Fourchette d'occasion estimée, en euros (voir BookValueService).
+    /// Conservée pour que l'étagère puisse l'afficher sans réinterroger trois
+    /// catalogues à chaque affichage — un chineur qui rentre de brocante avec
+    /// trente livres ne va pas attendre quatre-vingt-dix appels réseau.
+    var estimatedLow: Int?
+    var estimatedHigh: Int?
+    var valuedAt: Date?
     var subjects: [String]
     var coverURLString: String?
     var publisher: String?

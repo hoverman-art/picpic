@@ -649,6 +649,21 @@ struct BookCard: View {
             .frame(width: 120, height: 170)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .shadow(color: Theme.ink.opacity(0.15), radius: 8, y: 4)
+            // La pastille n'apparaît qu'une fois la fiche ouverte : c'est là
+            // que l'estimation est calculée, et elle reste ensuite. De retour
+            // de brocante, la valeur du lot se lit d'un coup d'œil.
+            .overlay(alignment: .topTrailing) {
+                if let low = book.estimatedLow, let high = book.estimatedHigh {
+                    Text(low == high ? "≈ \(low) €" : "\(low)–\(high) €")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .foregroundStyle(Theme.ink)
+                        .padding(6)
+                        .accessibilityLabel("Estimé entre \(low) et \(high) euros")
+                }
+            }
 
             Text(book.title)
                 .font(.footnote.weight(.semibold))

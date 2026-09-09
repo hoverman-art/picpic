@@ -231,6 +231,56 @@ actor SudocSearchService {
         return try? await search(query, pageSize: 1).records.first
     }
 
+    // MARK: - Rareté : qui possède ce livre
+
+    /// PPN d'un ISBN, par le service `isbn2ppn` du Sudoc.
+    ///
+    /// Un même ISBN peut porter plusieurs notices (rééditions décrites
+    /// séparément) : on garde la première, celle du signalement principal.
+    func ppn(isbn: String) async -> String? {
+        let digits = isbn.filter { $0.isNumber || $0 == "X" }
+        guard !digits.isEmpty,
+              let url = URL(string: "https://www.sudoc.fr/services/isbn2ppn/\(digits)"),
+              let (data, response) = try? await session.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let xml = String(data: data, encoding: .utf8)
+        else { return nil }
+        return Self.firstTag("ppn", in: xml)
+    }
+
+    /// Nombre de bibliothèques françaises qui possèdent la notice.
+    ///
+    /// C'est le signal de rareté le plus honnête dont on dispose : il vient du
+    /// catalogue collectif, pas d'une estimation. « L'Étranger » en Folio est
+    /// dans 67 bibliothèques ; un tirage confidentiel dans deux ou trois.
+    func libraryCount(ppn: String) async -> Int? {
+        guard let url = URL(string: "https://www.sudoc.fr/services/multiwhere/\(ppn)"),
+              let (data, response) = try? await session.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let xml = String(data: data, encoding: .utf8)
+        else { return nil }
+        return Self.countTag("shortname", in: xml)
+    }
+
+    static func firstTag(_ tag: String, in xml: String) -> String? {
+        guard let open = xml.range(of: "<\(tag)>"),
+              let close = xml.range(of: "</\(tag)>", range: open.upperBound ..< xml.endIndex)
+        else { return nil }
+        let value = String(xml[open.upperBound ..< close.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    static func countTag(_ tag: String, in xml: String) -> Int {
+        var count = 0
+        var cursor = xml.startIndex
+        while let found = xml.range(of: "<\(tag)>", range: cursor ..< xml.endIndex) {
+            count += 1
+            cursor = found.upperBound
+        }
+        return count
+    }
+
     private func throttle() async {
         let elapsed = Date().timeIntervalSince(lastRequest)
         if elapsed < minimumInterval {

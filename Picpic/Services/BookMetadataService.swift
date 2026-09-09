@@ -67,26 +67,83 @@ struct BookMetadataService {
         guard !isbn.isEmpty else { throw BookMetadataError.notFound }
 
         // Rang = richesse de la fiche : Google Books porte le résumé, Open
-        // Library la couverture et les thèmes, le Sudoc l'essentiel.
-        let results = await withTaskGroup(of: (Int, BookMetadata?).self) { group in
+        // Library la couverture et les thèmes, la BnF l'édition exacte, le
+        // Sudoc l'essentiel.
+        //
+        // La BnF est la quatrième source, ajoutée le 9 septembre 2026 : ce
+        // jour-là Google Books renvoyait de nouveau 429 sur son quota partagé,
+        // et le dépôt légal ne connaît pas de quota. Elle apporte en plus la
+        // collection et le format, que personne d'autre ne donne.
+        //
+        // On n'attend plus que Google : les quatre réponses sont collectées,
+        // la plus riche sert de base et les autres bouchent ses trous. Avant,
+        // une fiche sans résumé restait sans résumé même quand une autre
+        // source en avait un.
+        let collected = await withTaskGroup(of: (Int, BookMetadata?).self) { group in
             group.addTask { (0, try? await self.fetchFromGoogleBooks(isbn: isbn)) }
             group.addTask { (1, try? await self.fetchFromOpenLibrary(isbn: isbn)) }
-            group.addTask { (2, await self.fetchFromSudoc(isbn: isbn)) }
+            group.addTask { (2, await self.fetchFromBnF(isbn: isbn)) }
+            group.addTask { (3, await self.fetchFromSudoc(isbn: isbn)) }
 
-            var best: (rank: Int, metadata: BookMetadata)?
+            var found: [(rank: Int, metadata: BookMetadata)] = []
             for await (rank, metadata) in group {
-                guard let metadata else { continue }
-                if best == nil || rank < best!.rank {
-                    best = (rank, metadata)
-                }
-                // Google Books a répondu : inutile d'attendre les autres.
-                if rank == 0 { group.cancelAll(); break }
+                if let metadata { found.append((rank, metadata)) }
             }
-            return best?.metadata
+            return found.sorted { $0.rank < $1.rank }.map(\.metadata)
         }
 
-        guard let results else { throw BookMetadataError.notFound }
-        return results
+        guard var merged = collected.first else { throw BookMetadataError.notFound }
+        for other in collected.dropFirst() {
+            merged = Self.filling(merged, with: other)
+        }
+
+        // Dernier recours pour le résumé : l'article de Wikipédia. C'est ce
+        // qu'on regarde en premier quand on tient un livre inconnu, et sans
+        // Google Books la fiche n'en avait aucun.
+        if merged.description?.isEmpty != false,
+           let summary = await WikipediaSummaryService.shared.summary(
+               title: merged.title, authors: merged.authors) {
+            // Attribution obligatoire : le texte est celui de Wikipédia,
+            // publié sous CC BY-SA. Il voyage avec la fiche, donc la mention
+            // aussi — la stocker à part demanderait une migration du modèle
+            // pour une ligne de texte.
+            merged.description = summary.extract + "\n\nRésumé : Wikipédia (CC BY-SA)." 
+        }
+        return merged
+    }
+
+    /// Complète une fiche avec ce qu'une autre source a et qu'elle n'a pas.
+    /// Ne remplace jamais une valeur déjà présente : la source la mieux classée
+    /// reste la référence.
+    static func filling(_ base: BookMetadata, with other: BookMetadata) -> BookMetadata {
+        var result = base
+        if result.description?.isEmpty != false { result.description = other.description }
+        if result.coverURLString?.isEmpty != false { result.coverURLString = other.coverURLString }
+        if result.subjects.isEmpty { result.subjects = other.subjects }
+        if result.publisher?.isEmpty != false { result.publisher = other.publisher }
+        if result.publishedDate?.isEmpty != false { result.publishedDate = other.publishedDate }
+        if result.pageCount == nil { result.pageCount = other.pageCount }
+        if result.language?.isEmpty != false { result.language = other.language }
+        if result.authors.isEmpty { result.authors = other.authors }
+        return result
+    }
+
+    // MARK: - BnF (le dépôt légal : l'édition exacte, sans quota)
+
+    private func fetchFromBnF(isbn: String) async -> BookMetadata? {
+        guard let edition = await BnFService.shared.edition(isbn: isbn) else { return nil }
+        return BookMetadata(
+            isbn: isbn,
+            title: edition.title,
+            authors: edition.authors,
+            description: nil,
+            subjects: [],
+            coverURLString: "https://covers.openlibrary.org/b/isbn/\(isbn)-L.jpg",
+            publisher: edition.publisher,
+            publishedDate: edition.year,
+            pageCount: edition.pageCount,
+            language: "fr"
+        )
     }
 
     // MARK: - Sudoc (troisième source, sans résumé ni couverture propre)

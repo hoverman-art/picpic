@@ -19,7 +19,7 @@ final class PicpicUITests: XCTestCase {
                            freeReadingStub: Bool = false,
                            sudocStub: Bool = false,
                            demoBooks: Bool = false,
-                           audioStub: Bool = false,
+                           audioStub: Bool = true,
                            catalogStub: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-onboarding.done", onboardingDone ? "YES" : "NO"]
@@ -39,6 +39,9 @@ final class PicpicUITests: XCTestCase {
         if demoBooks {
             app.launchArguments += ["-uitest-demo-books"]
         }
+        // Par défaut : la sélection audio du jour est bouchonnée. Sa hauteur
+        // dépendait du réseau, et la grille de tuiles se retrouvait tantôt à
+        // un balayage, tantôt à deux — deux tests tombaient au hasard.
         if audioStub {
             app.launchArguments += ["-uitest-audio-stub"]
         }
@@ -135,8 +138,9 @@ final class PicpicUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Scanne ton premier livre"].exists, "État vide absent")
 
         // Grille des features : uniquement des features livrées, aucun « Bientôt »
-        app.swipeUp()
-        XCTAssertTrue(app.staticTexts["Aller plus loin"].waitForExistence(timeout: 3), "Section grille premium absente")
+        XCTAssertTrue(scrollUntilVisible(app.staticTexts["Aller plus loin"], in: app),
+                      "Section grille premium absente")
+        _ = scrollUntilVisible(app.staticTexts["Dispo autour de moi"], in: app)
         XCTAssertTrue(app.staticTexts["Dispo autour de moi"].exists, "Tuile disponibilité absente")
         XCTAssertTrue(app.staticTexts["Lire & écouter gratuit"].exists, "Tuile lecture gratuite absente")
         XCTAssertFalse(app.staticTexts["Bientôt"].exists, "Aucune tuile ne doit afficher « Bientôt »")
@@ -268,10 +272,9 @@ final class PicpicUITests: XCTestCase {
         let app = launchApp(onboardingDone: true, resetBooks: true, freeReadingStub: true)
 
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
-        app.swipeUp()
         let tile = app.buttons.containing(.staticText, identifier: "Lire & écouter gratuit").firstMatch
-        XCTAssertTrue(tile.waitForExistence(timeout: 3), "Tuile lecture gratuite absente")
-        tile.tap()
+        XCTAssertTrue(scrollUntilVisible(tile, in: app), "Tuile lecture gratuite absente")
+        scrollToTap(tile, in: app)
 
         XCTAssertTrue(app.navigationBars["Lire & écouter gratuit"].waitForExistence(timeout: 4),
                       "L'écran lecture gratuite doit s'ouvrir")

@@ -143,7 +143,22 @@ struct StatsView: View {
             // français. `formatted` suit celle de l'application.
             statTile(value: averageRating.map { "\($0.formatted(.number.precision(.fractionLength(1)))) ★" } ?? "—",
                      label: "note moyenne", symbol: "star.fill", tint: Theme.gold)
+            if let estimated = estimatedValue {
+                statTile(value: estimated, label: "valeur d'occasion estimée",
+                         symbol: "eurosign.circle.fill", tint: Theme.teal)
+            }
         }
+    }
+
+    /// Somme des fourchettes des livres déjà estimés — c'est-à-dire ceux dont
+    /// la fiche a été ouverte. La tuile ne s'affiche donc pas tant qu'aucune
+    /// estimation n'existe, plutôt que d'annoncer zéro euro.
+    private var estimatedValue: String? {
+        let valued = books.filter { $0.estimatedLow != nil && $0.estimatedHigh != nil }
+        guard !valued.isEmpty else { return nil }
+        let low = valued.reduce(0) { $0 + ($1.estimatedLow ?? 0) }
+        let high = valued.reduce(0) { $0 + ($1.estimatedHigh ?? 0) }
+        return "\(low)–\(high) €"
     }
 
     private func statTile(value: String, label: String, symbol: String, tint: Color) -> some View {
