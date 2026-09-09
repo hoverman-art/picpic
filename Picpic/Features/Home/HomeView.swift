@@ -39,6 +39,11 @@ struct HomeView: View {
     /// Les écrans de fonctionnalité passent par une seule feuille : empiler
     /// dix `.sheet` sur la même vue devient vite impossible à raisonner.
     @State private var sheet: HomeSheet?
+    /// Livre audio du jour en cours d'écoute.
+    @State private var playingAudiobook: FreeAudiobook?
+    /// Ce que les catalogues ouverts proposent pour la recherche en cours.
+    @State private var catalogResults: [CatalogResult] = []
+    @State private var catalogSearching = false
     @FocusState private var searchFocused: Bool
     /// Réserve sous le contenu pour le bouton Scanner flottant : elle grandit
     /// avec la taille de texte, sinon le bouton recouvre la dernière carte.
@@ -62,6 +67,10 @@ struct HomeView: View {
                     // Ce qu'on ouvre l'application pour voir arrive en premier :
                     // l'étagère est passée juste sous la recherche, et la carte
                     // BU, la série et la bannière Pro sont descendues sous elle.
+                    if !searchText.isEmpty {
+                        catalogSection
+                    }
+
                     if books.isEmpty {
                         emptyState
                             .staggeredAppear(index: 2, isVisible: appeared)
@@ -69,6 +78,9 @@ struct HomeView: View {
                         bookShelf
                             .staggeredAppear(index: 2, isVisible: appeared)
                     }
+
+                    DailyAudioShelf(playing: $playingAudiobook)
+                        .staggeredAppear(index: 3, isVisible: appeared)
 
                     campusCard
                         .staggeredAppear(index: 3, isVisible: appeared)
@@ -89,6 +101,21 @@ struct HomeView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(Theme.paper)
             .overlay(alignment: .bottom) { scanButton }
+            // La recherche dans les catalogues suit la frappe, avec un temps
+            // mort : sans lui, « Bovary » lancerait six requêtes.
+            .task(id: searchText) {
+                let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard query.count >= 3 else {
+                    catalogResults = []
+                    catalogSearching = false
+                    return
+                }
+                catalogSearching = true
+                try? await Task.sleep(for: .milliseconds(450))
+                guard !Task.isCancelled else { return }
+                catalogResults = await CatalogSearchService.shared.search(query)
+                catalogSearching = false
+            }
             .navigationDestination(for: Book.self) { book in
                 BookDetailView(book: book)
             }
@@ -98,6 +125,9 @@ struct HomeView: View {
                         await viewModel.addBook(isbn: isbn, context: modelContext, settings: settings)
                     }
                 }
+            }
+            .sheet(item: $playingAudiobook) { audiobook in
+                AudioPlayerView(audiobook: audiobook)
             }
             .sheet(isPresented: $viewModel.showSuggestionModal) {
                 SmartSuggestionModal(books: books)
@@ -314,6 +344,91 @@ struct HomeView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 36)
         .background(.white, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    /// Ce que les catalogues ouverts proposent, sous les livres qu'on possède.
+    ///
+    /// La recherche par idée ne classait que la bibliothèque scannée : taper
+    /// le titre d'un roman qu'on n'a pas encore donnait « aucun résultat »,
+    /// comme si le livre n'existait pas. Ces lignes-là viennent de Google
+    /// Books et d'Open Library, et s'ajoutent en un geste.
+    @ViewBuilder
+    private var catalogSection: some View {
+        if catalogSearching || !catalogResults.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text("Ailleurs qu'ici")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        // L'identifiant va sur le titre, pas sur la section :
+                        // posé sur le conteneur, il écrasait celui de chaque
+                        // bouton « Ajouter » et les rendait introuvables.
+                        .accessibilityIdentifier("home.catalogResults")
+                    if catalogSearching { ProgressView().controlSize(.small) }
+                }
+                Text("Trouvé dans les catalogues ouverts — ajoute-le pour le suivre.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(catalogResults) { result in
+                    catalogRow(result)
+                }
+            }
+        }
+    }
+
+    private func catalogRow(_ result: CatalogResult) -> some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: result.coverURLString.flatMap(URL.init(string:))) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Image(systemName: "book.closed")
+                    .foregroundStyle(Theme.ink.opacity(0.25))
+            }
+            .frame(width: 38, height: 54)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(result.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(2)
+                Text([result.authorsLabel, result.year].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+
+            if let isbn = result.isbn {
+                Button {
+                    Task {
+                        await viewModel.addBook(isbn: isbn, context: modelContext, settings: settings)
+                        searchText = ""
+                        searchFocused = false
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.accent, in: Circle())
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityIdentifier("home.catalogAdd")
+                .accessibilityLabel("Ajouter \(result.title)")
+            } else {
+                // Sans ISBN, l'application ne sait ni retrouver la couverture,
+                // ni chercher la disponibilité : mieux vaut le dire que
+                // d'ajouter une fiche vide.
+                Text("sans ISBN")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(12)
+        .background(.white, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        .shadow(color: Theme.ink.opacity(0.05), radius: 8, y: 3)
     }
 
     private var bookShelf: some View {

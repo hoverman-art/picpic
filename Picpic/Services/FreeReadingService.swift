@@ -110,7 +110,7 @@ actor FreeReadingService {
         if let hit = await searchGutendex(title: title, authors: authors) {
             return hit
         }
-        return await searchWikisource(title: title)
+        return await searchWikisource(title: title, authors: authors)
     }
 
     private func searchGutendex(title: String, authors: [String]) async -> FreeEbook? {
@@ -151,12 +151,26 @@ actor FreeReadingService {
         let query: Query?
     }
 
-    private func searchWikisource(title: String) async -> FreeEbook? {
+    /// Wikisource ne dit pas qui a écrit la page qu'elle renvoie : c'est
+    /// pourquoi le nom de l'auteur entre dans la requête en texte libre, et
+    /// pourquoi le titre doit correspondre exactement.
+    ///
+    /// Sans ces deux verrous, « L'Étranger » de Camus — qui n'est pas au
+    /// domaine public — tombait sur le poème de Baudelaire : le titre
+    /// normalisé « etranger » se retrouve dans des dizaines de pages, et
+    /// `titlesMatch` se contente d'une inclusion. L'utilisateur voyait une
+    /// édition gratuite promise, puis « Lecture impossible ». Mesuré le
+    /// 9 septembre 2026 : `intitle:"etranger"` renvoie 14 pages,
+    /// `intitle:"etranger" Camus` en renvoie zéro, et « Madame Bovary »
+    /// Flaubert reste trouvé du premier coup.
+    private func searchWikisource(title: String, authors: [String]) async -> FreeEbook? {
+        let terms = (["intitle:\"\(Self.normalized(title))\""] + authors.compactMap(Self.familyName))
+            .joined(separator: " ")
         var components = URLComponents(string: "https://fr.wikisource.org/w/api.php")!
         components.queryItems = [
             URLQueryItem(name: "action", value: "query"),
             URLQueryItem(name: "list", value: "search"),
-            URLQueryItem(name: "srsearch", value: "intitle:\"\(Self.normalized(title))\""),
+            URLQueryItem(name: "srsearch", value: terms),
             URLQueryItem(name: "srlimit", value: "10"),
             URLQueryItem(name: "format", value: "json"),
         ]
@@ -167,7 +181,7 @@ actor FreeReadingService {
         for result in decoded.query?.search ?? [] {
             guard let page = result.title,
                   !page.contains("/"),
-                  Self.titlesMatch(query: title, candidate: page) else { continue }
+                  Self.normalized(page) == Self.normalized(title) else { continue }
             var export = URLComponents(string: "https://ws-export.wmcloud.org/")!
             export.queryItems = [
                 URLQueryItem(name: "format", value: "epub"),

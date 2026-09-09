@@ -9,6 +9,7 @@
 //
 
 import AVFoundation
+import CryptoKit
 import SwiftUI
 import WebKit
 
@@ -27,6 +28,8 @@ struct EPUBReaderView: View {
     @State private var content: (html: String, paragraphs: [String])?
     @State private var errorMessage: String?
     @State private var isLoading = true
+    /// Le chapitre est téléchargé, il reste à le mettre en page.
+    @State private var isRendering = false
     @State private var showChapters = false
     @State private var showSettings = false
     @State private var showChrome = true
@@ -42,7 +45,7 @@ struct EPUBReaderView: View {
             ZStack {
                 settings.theme.background.ignoresSafeArea()
 
-                if isLoading {
+                if isLoading || isRendering {
                     loadingState
                 } else if let errorMessage {
                     errorState(errorMessage)
@@ -99,7 +102,7 @@ struct EPUBReaderView: View {
     private var loadingState: some View {
         VStack(spacing: 14) {
             ProgressView()
-            Text("Téléchargement du livre…")
+            Text(isRendering ? "Mise en page…" : "Téléchargement du livre…")
                 .font(.subheadline)
                 .foregroundStyle(settings.theme.foreground.opacity(0.7))
         }
@@ -314,9 +317,23 @@ struct EPUBReaderView: View {
         settings.setLastChapter(index, for: progressKey)
     }
 
+    /// Prépare le chapitre hors du fil principal.
+    ///
+    /// Le faire sur place figeait l'écran : marquer les paragraphes et
+    /// incruster les images parcourt le HTML caractère par caractère, et un
+    /// chapitre de roman entier prend plusieurs secondes. On restait sur
+    /// « Téléchargement du livre… » alors que le fichier était déjà là.
     private func loadChapterContent() {
         guard let document, let chapter else { content = nil; return }
-        content = (try? document.readable(chapter)) ?? nil
+        isRendering = true
+        Task {
+            let rendered = await Task.detached(priority: .userInitiated) {
+                (try? document.readable(chapter)) ?? nil
+            }.value
+            guard chapter == self.chapter else { return }  // l'utilisateur a tourné la page
+            content = rendered
+            isRendering = false
+        }
     }
 
     private func load() async {
@@ -332,8 +349,13 @@ struct EPUBReaderView: View {
                 try EPUBDocument(data: data)
             }.value
             document = parsed
+            // Sans reprise enregistrée, on ouvre sur le premier chapitre qui a
+            // du texte : la couverture seule laissait croire à un livre qui ne
+            // se charge pas.
             let saved = settings.lastChapter(for: progressKey)
-            chapterIndex = parsed.chapters.indices.contains(saved) ? saved : 0
+            chapterIndex = parsed.chapters.indices.contains(saved) && saved > 0
+                ? saved
+                : parsed.firstReadableChapter
             loadChapterContent()
             // Ouvrir un livre, c'est lire : la série du jour est acquise.
             goals.recordActivity()
@@ -629,8 +651,12 @@ actor EPUBLoader {
         let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("epubs", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        // Nom de fichier stable et sans caractère interdit.
-        let name = String(url.absoluteString.hashValue.magnitude, radix: 36)
+        // Nom de fichier stable et sans caractère interdit. `hashValue` ne
+        // convient pas : Swift le sale à chaque lancement, si bien qu'un livre
+        // téléchargé n'était jamais relu depuis le cache — la lecture hors
+        // connexion, promise sur la fiche App Store, ne marchait pas.
+        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let name = digest.compactMap { String(format: "%02x", $0) }.joined().prefix(32)
         return directory.appendingPathComponent("\(name).epub")
     }
 }

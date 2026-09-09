@@ -19,6 +19,9 @@ nonisolated struct EPUBChapter: Identifiable, Hashable, Sendable {
     let title: String
     /// Chemin de la ressource dans l'archive.
     let path: String
+    /// Rang du morceau quand le fichier a été redécoupé sur ses titres.
+    /// `nil` = le fichier entier est le chapitre.
+    var segment: Int?
 }
 
 nonisolated struct EPUBDocument: Sendable {
@@ -30,6 +33,8 @@ nonisolated struct EPUBDocument: Sendable {
     private let archive: ZIPArchive
     /// Dossier de l'OPF : les chemins du manifeste en sont relatifs.
     private let rootPath: String
+    /// Morceaux déjà découpés, par chemin de fichier.
+    private let segments: [String: [String]]
 
     enum Failure: LocalizedError {
         case noContainer
@@ -65,22 +70,61 @@ nonisolated struct EPUBDocument: Sendable {
         let spine = Self.spine(from: package)
 
         // Le spine donne l'ordre de lecture ; le manifeste donne les chemins.
+        //
+        // Il ne donne pas les chapitres pour autant : un EPUB du Projet
+        // Gutenberg tient tout le roman dans UN fichier, et « Le Fantôme de
+        // l'Opéra » s'ouvrait donc en six pages — couverture, titre, le livre
+        // entier d'un bloc, puis la licence en anglais. Impossible d'avancer,
+        // impossible de reprendre où l'on en était. On redécoupe ces gros
+        // fichiers sur leurs propres titres.
         var chapters: [EPUBChapter] = []
+        var segments: [String: [String]] = [:]
+        var firstWithText: Int?
         for (index, idref) in spine.enumerated() {
             guard let href = manifest[idref] else { continue }
             let path = Self.resolve(href, relativeTo: rootPath)
-            // Un vrai titre plutôt que « Chapitre 3 » : le premier titre du
-            // document, à défaut son <title>, à défaut le rang.
-            let raw = (try? archive.string(for: path)) ?? nil
-            chapters.append(EPUBChapter(
-                id: idref,
-                title: raw.flatMap(Self.headingTitle) ?? "Chapitre \(index + 1)",
-                path: path
-            ))
+            guard let raw = (try? archive.string(for: path)) ?? nil else { continue }
+            let body = Self.bodyContent(of: raw)
+
+            // Le fichier est d'abord redécoupé, ensuite seulement filtré : chez
+            // le Projet Gutenberg, l'en-tête anglais et les neuf premiers
+            // chapitres du roman vivent dans LE MÊME fichier. Jeter le fichier
+            // entier parce qu'il commence par la licence amputait le livre —
+            // constaté sur « Le Fantôme de l'Opéra », qui s'ouvrait alors au
+            // chapitre X.
+            let kept = Self.split(body).filter { !Self.isBoilerplate($0.html) }
+            guard !kept.isEmpty else { continue }
+
+            segments[path] = kept.map(\.html)
+            for (rank, piece) in kept.enumerated() {
+                if firstWithText == nil, piece.html.count > 1_500 {
+                    firstWithText = chapters.count
+                }
+                chapters.append(EPUBChapter(
+                    id: kept.count > 1 ? "\(idref)#\(rank)" : idref,
+                    title: piece.title
+                        ?? Self.headingTitle(raw)
+                        ?? "Chapitre \(index + 1)",
+                    path: path,
+                    segment: rank
+                ))
+            }
         }
         guard !chapters.isEmpty else { throw Failure.noChapters }
         self.chapters = chapters
+        self.segments = segments
+        self.firstReadableChapter = firstWithText ?? 0
     }
+
+    /// Le premier chapitre qui a du texte : sur quoi ouvrir quand on n'a pas
+    /// encore lu. Sans ça, le livre s'ouvrait sur sa couverture et on pouvait
+    /// croire qu'il ne s'était pas chargé.
+    ///
+    /// Calculé une fois à l'ouverture, avec le texte qu'on vient déjà de
+    /// parcourir : le déduire en rappelant `readable` sur chaque chapitre
+    /// remettait l'inlining des images et le marquage des paragraphes sur le
+    /// fil principal, et l'écran restait sur « Téléchargement du livre… ».
+    let firstReadableChapter: Int
 
     /// Le XHTML d'un chapitre, prêt à être affiché.
     func html(for chapter: EPUBChapter) throws -> String? {
@@ -92,10 +136,98 @@ nonisolated struct EPUBDocument: Sendable {
     /// Les deux tableaux sont alignés par indice — c'est ce qui permet de
     /// surligner le paragraphe qu'on entend.
     func readable(_ chapter: EPUBChapter) throws -> (html: String, paragraphs: [String])? {
-        guard let raw = try archive.string(for: chapter.path) else { return nil }
-        let body = Self.strippingScripts(Self.bodyContent(of: raw))
+        let source: String
+        if let segment = chapter.segment, let pieces = segments[chapter.path],
+           pieces.indices.contains(segment) {
+            source = pieces[segment]
+        } else {
+            guard let raw = try archive.string(for: chapter.path) else { return nil }
+            source = Self.bodyContent(of: raw)
+        }
+        let body = Self.strippingScripts(source)
         let inlined = inliningImages(in: body, chapterPath: chapter.path)
         return Self.markingParagraphs(in: inlined)
+    }
+
+    // MARK: - Découpage d'un gros fichier en chapitres
+
+    /// Un morceau de fichier : son titre s'il en a un, et son HTML.
+    private struct Piece { let title: String?; let html: String }
+
+    /// Titres sur lesquels un livre se découpe. `h1` d'abord : si le fichier
+    /// n'en a pas assez, on descend d'un cran plutôt que de renvoyer un pavé.
+    ///
+    /// `h4` en fait partie parce que c'est ce qu'utilise le Projet Gutenberg :
+    /// « Le Fantôme de l'Opéra » place ses chapitres en `h4`, ses deux `h2`
+    /// servant à l'en-tête du fichier. S'arrêter à `h3` laissait le roman en
+    /// un seul bloc.
+    private static let splitTags = ["h1", "h2", "h3", "h4"]
+
+    /// Redécoupe le corps d'un fichier sur ses titres.
+    ///
+    /// Ne découpe que ce qui le mérite : un fichier court est déjà un
+    /// chapitre, et le fractionner ferait une table des matières de vingt
+    /// lignes pour trois pages de texte.
+    private static func split(_ body: String) -> [Piece] {
+        // On mesure le HTML brut, pas le texte : `strippingTags` parcourt la
+        // chaîne caractère par caractère, ce qui coûte des secondes sur un
+        // roman entier en build de débogage — l'écran restait sur
+        // « Téléchargement du livre… » alors que le fichier était là.
+        guard body.count > 20_000 else { return [Piece(title: nil, html: body)] }
+
+        for tag in splitTags {
+            let starts = headingStarts(of: tag, in: body)
+            guard starts.count >= 3 else { continue }
+
+            var pieces: [Piece] = []
+            // Ce qui précède le premier titre (dédicace, exergue) reste avec lui.
+            for (rank, start) in starts.enumerated() {
+                let from = rank == 0 ? body.startIndex : start
+                let to = rank + 1 < starts.count ? starts[rank + 1] : body.endIndex
+                let html = String(body[from ..< to])
+                pieces.append(Piece(title: headingTitle(html), html: html))
+            }
+            return pieces
+        }
+        return [Piece(title: nil, html: body)]
+    }
+
+    /// Position de chaque `<tag …>` d'ouverture, dans l'ordre.
+    private static func headingStarts(of tag: String, in html: String) -> [String.Index] {
+        var starts: [String.Index] = []
+        var cursor = html.startIndex
+        while let open = html.range(of: "<\(tag)", options: .caseInsensitive,
+                                   range: cursor ..< html.endIndex) {
+            let after = open.upperBound
+            // `<h1` ne doit pas capturer `<h1x` : il faut un délimiteur.
+            if after < html.endIndex, let scalar = html[after].unicodeScalars.first,
+               CharacterSet.alphanumerics.contains(scalar) {
+                cursor = after
+                continue
+            }
+            starts.append(open.lowerBound)
+            cursor = after
+        }
+        return starts
+    }
+
+    /// La licence du Projet Gutenberg, présente dans tous ses EPUB, en
+    /// anglais et sans intérêt pour le lecteur.
+    private static func isBoilerplate(_ body: String) -> Bool {
+        guard body.count > 800 else { return false }
+        // Recherche sur le HTML brut : les marqueurs de la licence ne sont
+        // jamais coupés par une balise, et parcourir le texte nettoyé coûterait
+        // un balayage de plus par fichier.
+        func has(_ needle: String) -> Bool {
+            body.range(of: needle, options: .caseInsensitive) != nil
+        }
+        return has("START: FULL LICENSE")
+            || has("THE FULL PROJECT GUTENBERG LICENSE")
+            || (has("PROJECT GUTENBERG") && has("Section 1."))
+            // L'en-tête, en anglais lui aussi : titre, licence, date de mise
+            // en ligne, encodage. Le livre s'ouvrait dessus.
+            || has("This eBook is for the use of anyone anywhere")
+            || (has("Release date:") && has("Language:") && has("Credits:"))
     }
 
     /// Retire les scripts de l'EPUB. La liseuse exécute son propre script pour

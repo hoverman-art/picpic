@@ -18,7 +18,9 @@ final class PicpicUITests: XCTestCase {
     private func launchApp(onboardingDone: Bool, resetBooks: Bool = false, pro: Bool = false,
                            freeReadingStub: Bool = false,
                            sudocStub: Bool = false,
-                           demoBooks: Bool = false) -> XCUIApplication {
+                           demoBooks: Bool = false,
+                           audioStub: Bool = false,
+                           catalogStub: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-onboarding.done", onboardingDone ? "YES" : "NO"]
         app.launchArguments += ["-stats.scanCount", "0"]
@@ -37,8 +39,29 @@ final class PicpicUITests: XCTestCase {
         if demoBooks {
             app.launchArguments += ["-uitest-demo-books"]
         }
+        if audioStub {
+            app.launchArguments += ["-uitest-audio-stub"]
+        }
+        if catalogStub {
+            app.launchArguments += ["-uitest-catalog-stub"]
+        }
         app.launch()
         return app
+    }
+
+    /// Fait défiler jusqu'à ce que l'élément apparaisse dans l'arbre.
+    ///
+    /// Loin sous la ligne de flottaison, une vue n'existe pas encore pour
+    /// XCTest : `waitForExistence` renvoie faux sans que rien ne soit cassé.
+    @discardableResult
+    private func scrollUntilVisible(_ element: XCUIElement, in app: XCUIApplication,
+                                    swipes: Int = 8) -> Bool {
+        var remaining = swipes
+        while !element.exists && remaining > 0 {
+            app.swipeUp()
+            remaining -= 1
+        }
+        return element.exists
     }
 
     /// Fait défiler jusqu'à ce que l'élément soit réellement tapable.
@@ -370,6 +393,41 @@ final class PicpicUITests: XCTestCase {
                       "La bibliothèque complète revient après effacement")
     }
 
+    // MARK: - Feature 13 ter : la sélection audio du jour
+
+    /// L'accueil ne bougeait pas d'un jour à l'autre. Cette étagère change tous
+    /// les jours et mène à ce qui s'écoute gratuitement.
+    @MainActor
+    func testDailyAudioShelfIsOnHome() throws {
+        let app = launchApp(onboardingDone: true, demoBooks: true, audioStub: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["À écouter aujourd'hui"].waitForExistence(timeout: 5),
+                      "La sélection du jour doit être sur l'accueil")
+        let items = app.buttons.matching(identifier: "home.dailyAudio.item")
+        XCTAssertGreaterThan(items.count, 0, "La sélection doit proposer des livres")
+    }
+
+    // MARK: - Feature 13 quater : chercher un livre qu'on n'a pas
+
+    /// La recherche ne regardait que les livres scannés : taper le titre d'un
+    /// roman qu'on ne possède pas ne donnait rien.
+    @MainActor
+    func testSearchAlsoFindsBooksOutsideTheLibrary() throws {
+        let app = launchApp(onboardingDone: true, demoBooks: true, catalogStub: true)
+
+        XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
+        let field = app.textFields["home.search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.tap()
+        field.typeText("bovary")
+
+        XCTAssertTrue(app.staticTexts["Ailleurs qu'ici"].waitForExistence(timeout: 8),
+                      "Les catalogues ouverts doivent compléter la bibliothèque")
+        XCTAssertTrue(app.buttons.matching(identifier: "home.catalogAdd").firstMatch.waitForExistence(timeout: 5),
+                      "Chaque résultat doit pouvoir être ajouté")
+    }
+
     // MARK: - Feature 14 : Objectifs & série de lecture
 
     @MainActor
@@ -395,10 +453,11 @@ final class PicpicUITests: XCTestCase {
         let app = launchApp(onboardingDone: true, resetBooks: true)
 
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 5))
-        app.swipeUp()
+        // La grille descend à chaque section ajoutée à l'accueil — la
+        // sélection audio du jour l'a repoussée d'un écran.
         let tile = app.buttons.containing(.staticText, identifier: "Citations").firstMatch
-        XCTAssertTrue(tile.waitForExistence(timeout: 3), "La tuile Citations doit exister")
-        tile.tap()
+        XCTAssertTrue(scrollUntilVisible(tile, in: app), "La tuile Citations doit exister")
+        scrollToTap(tile, in: app)
 
         XCTAssertTrue(app.navigationBars["Mes citations"].waitForExistence(timeout: 4))
         app.buttons["quotes.add"].tap()
