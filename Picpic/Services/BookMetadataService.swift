@@ -39,6 +39,9 @@ enum BookMetadataError: LocalizedError {
 }
 
 struct BookMetadataService {
+
+    /// Rang réservé à la tâche qui compte le temps, jamais à un catalogue.
+    private static let budgetSentinel = 99
     /// Session dédiée : `URLSession.shared` attend 60 s, or la boucle
     /// parallèle ne rend la main qu'une fois toutes les sources retombées.
     /// Un catalogue qui traîne bloquerait l'écran une minute.
@@ -79,16 +82,34 @@ struct BookMetadataService {
         // la plus riche sert de base et les autres bouchent ses trous. Avant,
         // une fiche sans résumé restait sans résumé même quand une autre
         // source en avait un.
+        // Budget : on ne fait pas attendre le scan derrière la source la plus
+        // lente. Passé six secondes, on part avec ce qui est arrivé — Open
+        // Library met parfois 22 s à répondre, et un scan qui dure une demi-
+        // minute est un scan raté. Tant que RIEN n'est arrivé, on attend
+        // quand même : mieux vaut tard qu'un « livre introuvable » faux.
+        let deadline = 6
         let collected = await withTaskGroup(of: (Int, BookMetadata?).self) { group in
             group.addTask { (0, try? await self.fetchFromGoogleBooks(isbn: isbn)) }
             group.addTask { (1, try? await self.fetchFromOpenLibrary(isbn: isbn)) }
             group.addTask { (2, await self.fetchFromBnF(isbn: isbn)) }
             group.addTask { (3, await self.fetchFromSudoc(isbn: isbn)) }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(deadline))
+                return (Self.budgetSentinel, nil)
+            }
 
             var found: [(rank: Int, metadata: BookMetadata)] = []
+            var answered = 0
             for await (rank, metadata) in group {
+                if rank == Self.budgetSentinel {
+                    if !found.isEmpty { break }
+                    continue
+                }
+                answered += 1
                 if let metadata { found.append((rank, metadata)) }
+                if answered == 4 { break }
             }
+            group.cancelAll()
             return found.sorted { $0.rank < $1.rank }.map(\.metadata)
         }
 
