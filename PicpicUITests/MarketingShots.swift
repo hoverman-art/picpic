@@ -90,16 +90,6 @@ final class MarketingShots: XCTestCase {
     }
 
     @MainActor
-    func testCaptureReader() throws {
-        // Le chapitre 4 est du texte courant ; les premiers sont couverture et
-        // préambule Gutenberg.
-        let app = app(["-uitest-open", "reader", "-reader.progress.uitest-reader", "3"])
-        XCTAssertTrue(app.buttons["reader.listen"].waitForExistence(timeout: 40),
-                      "Le livre doit être téléchargé et affiché")
-        shoot(app, "reader_full")
-    }
-
-    @MainActor
     func testCaptureProScreens() throws {
         let shelf = app(["-uitest-pro", "-uitest-open", "shelfscan"])
         XCTAssertTrue(shelf.navigationBars.firstMatch.waitForExistence(timeout: 8))
@@ -118,8 +108,8 @@ final class MarketingShots: XCTestCase {
 
     @MainActor
     func testCaptureFreeReading() throws {
-        let app = app(["-uitest-freereading-stub", "-uitest-open", "freereading"])
-        XCTAssertTrue(app.staticTexts["Classiques à découvrir"].waitForExistence(timeout: 10))
+        let app = app(["-uitest-freereading-stub", "-uitest-audio-stub", "-uitest-open", "freereading"])
+        XCTAssertTrue(app.staticTexts["Les plus écoutés"].waitForExistence(timeout: 10))
         shoot(app, "freereading_full")
     }
 }

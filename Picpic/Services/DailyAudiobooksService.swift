@@ -70,6 +70,15 @@ actor DailyAudiobooksService {
         return Self.pick(count, from: catalogue, day: Self.dayNumber(of: date))
     }
 
+    /// Le catalogue entier, du plus écouté au moins écouté : ce que montre
+    /// l'écran « Écouter gratuitement », là où l'accueil n'en tire que six.
+    func mostListened(limit: Int = 20) async -> [DailyAudiobook] {
+        if ProcessInfo.processInfo.arguments.contains("-uitest-audio-stub") {
+            return Array(Self.stub.prefix(limit))
+        }
+        return Array(await catalogue(on: .now).prefix(limit))
+    }
+
     /// Le catalogue, rechargé une fois par jour au plus.
     private func catalogue(on date: Date) async -> [DailyAudiobook] {
         let today = Self.dayNumber(of: date)

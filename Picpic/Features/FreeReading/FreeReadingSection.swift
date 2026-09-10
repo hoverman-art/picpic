@@ -2,9 +2,11 @@
 //  FreeReadingSection.swift
 //  Picpic
 //
-//  Section « Lire / écouter gratuitement » de la fiche livre : si l'œuvre
-//  est au domaine public, propose l'EPUB gratuit (ouvert dans Safari, qui
-//  sait l'envoyer vers Apple Livres) et l'audio LibriVox dans le lecteur.
+//  Section « Écouter gratuitement » de la fiche livre : si l'œuvre est au
+//  domaine public, propose son enregistrement LibriVox.
+//
+//  L'EPUB gratuit et la liseuse maison ont été retirés le 10 septembre 2026 —
+//  voir docs/AUDIO-PLUTOT-QUE-EPUB.md.
 //
 
 import SwiftUI
@@ -15,24 +17,15 @@ struct FreeReadingSection: View {
 
     @State private var match: FreeReadingMatch?
     @State private var audiobookToPlay: FreeAudiobook?
-    @State private var ebookToRead: FreeEbook?
 
     var body: some View {
         Group {
             if let match, !match.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Lire ou écouter gratuitement")
+                    Text("Écouter gratuitement")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Theme.ink)
 
-                    if let ebook = match.ebook {
-                        row(symbol: "book.fill",
-                            title: "Lire dans Picpic",
-                            detail: "Domaine public · \(ebook.source.rawValue)",
-                            identifier: "freereading.ebook") {
-                            ebookToRead = ebook
-                        }
-                    }
                     if let audiobook = match.audiobook {
                         row(symbol: "headphones",
                             title: "Écouter le livre audio",
@@ -50,11 +43,6 @@ struct FreeReadingSection: View {
         }
         .sheet(item: $audiobookToPlay) { audiobook in
             AudioPlayerView(audiobook: audiobook)
-        }
-        .fullScreenCover(item: $ebookToRead) { ebook in
-            EPUBReaderView(epubURL: ebook.epubURL,
-                           fallbackTitle: book.title,
-                           progressKey: book.isbn)
         }
     }
 

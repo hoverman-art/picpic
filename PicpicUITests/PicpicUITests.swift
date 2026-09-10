@@ -142,7 +142,7 @@ final class PicpicUITests: XCTestCase {
                       "Section grille premium absente")
         _ = scrollUntilVisible(app.staticTexts["Dispo autour de moi"], in: app)
         XCTAssertTrue(app.staticTexts["Dispo autour de moi"].exists, "Tuile disponibilité absente")
-        XCTAssertTrue(app.staticTexts["Lire & écouter gratuit"].exists, "Tuile lecture gratuite absente")
+        XCTAssertTrue(app.staticTexts["Écouter gratuitement"].exists, "Tuile écoute gratuite absente")
         XCTAssertFalse(app.staticTexts["Bientôt"].exists, "Aucune tuile ne doit afficher « Bientôt »")
     }
 
@@ -263,23 +263,23 @@ final class PicpicUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 8))
     }
 
-    // MARK: - Feature 10 : Lire & écouter gratuit (hors ligne via stub)
+    // MARK: - Feature 10 : Écouter gratuitement (hors ligne via stub)
 
     @MainActor
-    func testFreeLibraryOpensWithClassics() throws {
-        let app = launchApp(onboardingDone: true, resetBooks: true, freeReadingStub: true)
+    func testFreeLibraryOpensWithAudiobooks() throws {
+        let app = launchApp(onboardingDone: true, resetBooks: true, freeReadingStub: true, audioStub: true)
 
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 10))
-        let tile = app.buttons.containing(.staticText, identifier: "Lire & écouter gratuit").firstMatch
+        let tile = app.buttons.containing(.staticText, identifier: "Écouter gratuitement").firstMatch
         XCTAssertTrue(scrollUntilVisible(tile, in: app), "Tuile lecture gratuite absente")
         scrollToTap(tile, in: app)
 
-        XCTAssertTrue(app.navigationBars["Lire & écouter gratuit"].waitForExistence(timeout: 8),
-                      "L'écran lecture gratuite doit s'ouvrir")
-        XCTAssertTrue(app.staticTexts["Classiques à découvrir"].waitForExistence(timeout: 8),
+        XCTAssertTrue(app.navigationBars["Écouter gratuitement"].waitForExistence(timeout: 8),
+                      "L'écran d'écoute gratuite doit s'ouvrir")
+        XCTAssertTrue(app.staticTexts["Les plus écoutés"].waitForExistence(timeout: 8),
                       "La section découverte doit s'afficher")
-        XCTAssertTrue(app.staticTexts["Les Fleurs du mal"].waitForExistence(timeout: 8),
-                      "Les classiques (stub) doivent se charger")
+        XCTAssertTrue(app.staticTexts["Le Comte de Monte Cristo"].waitForExistence(timeout: 10),
+                      "Le catalogue (bouchon) doit se charger")
         app.buttons["Fermer"].tap()
         XCTAssertTrue(app.staticTexts["Ta bibliothèque"].waitForExistence(timeout: 8))
     }

@@ -14,8 +14,6 @@ private enum HomeSheet: String, Identifiable {
     /// `import` est un mot réservé : la valeur brute garde le nom court, qui
     /// sert d'argument de lancement aux tests UI et aux captures.
     case importLibrary = "import"
-    /// Ouverture directe de la liseuse — captures d'écran et vérification.
-    case reader
 
     var id: String { rawValue }
 }
@@ -44,6 +42,8 @@ struct HomeView: View {
     /// Ce que les catalogues ouverts proposent pour la recherche en cours.
     @State private var catalogResults: [CatalogResult] = []
     @State private var catalogSearching = false
+    /// Ce que la recherche visuelle a demandé d'ouvrir.
+    @State private var pending = PendingBook.shared
     @FocusState private var searchFocused: Bool
     /// Réserve sous le contenu pour le bouton Scanner flottant : elle grandit
     /// avec la taille de texte, sinon le bouton recouvre la dernière carte.
@@ -103,6 +103,13 @@ struct HomeView: View {
             .overlay(alignment: .bottom) { scanButton }
             // La recherche dans les catalogues suit la frappe, avec un temps
             // mort : sans lui, « Bovary » lancerait six requêtes.
+            // La recherche visuelle d'iOS 26 ouvre l'application sur un livre :
+            // s'il est déjà dans la bibliothèque, on va sur sa fiche ; sinon on
+            // remplit la recherche avec son titre, et « Ailleurs qu'ici »
+            // propose de l'ajouter. Un intent ne peut pas naviguer lui-même.
+            .onChange(of: pending.isbn) { _, _ in openPendingBook() }
+            .onChange(of: pending.title) { _, _ in openPendingBook() }
+            .task { openPendingBook() }
             .task(id: searchText) {
                 let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard query.count >= 3 else {
@@ -148,12 +155,6 @@ struct HomeView: View {
                 case .quotes: QuotesView()
                 case .assistant: AssistantView()
                 case .importLibrary: ImportView()
-                case .reader:
-                    EPUBReaderView(
-                        epubURL: URL(string: "https://www.gutenberg.org/ebooks/62215.epub3.images")!,
-                        fallbackTitle: "Le Fantôme de l'Opéra",
-                        progressKey: "uitest-reader"
-                    )
                 }
             }
             .sheet(isPresented: $viewModel.showRateModal) {
@@ -191,7 +192,6 @@ struct HomeView: View {
                 case "assistant": sheet = .assistant
                 case "import": sheet = .importLibrary
                 case "tutorial": showTutorial = true
-                case "reader": sheet = .reader
                 case "bookdetail":
                     if let first = books.first { navPath.append(first) }
                 default: break
@@ -240,6 +240,17 @@ struct HomeView: View {
     /// de validation ni bouton, le champ avait l'air cassé et le clavier ne
     /// se fermait jamais. Trois ajouts : la touche « Rechercher » ferme le
     /// clavier, une croix efface, et le défilement referme le clavier.
+    private func openPendingBook() {
+        guard pending.isbn != nil || pending.title != nil else { return }
+        if let isbn = pending.isbn, let book = books.first(where: { $0.isbn == isbn }) {
+            navPath = NavigationPath()
+            navPath.append(book)
+        } else if let title = pending.title {
+            searchText = title
+        }
+        pending.clear()
+    }
+
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "sparkle.magnifyingglass")
