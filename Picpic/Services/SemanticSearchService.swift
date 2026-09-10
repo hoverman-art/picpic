@@ -30,31 +30,81 @@ struct SemanticSearchService {
         return floats.withUnsafeBufferPointer { Data(buffer: $0) }
     }
 
-    /// Ranks books against a natural-language query. Returns books sorted by
-    /// relevance, best first. Books without embeddings are matched by text.
+    /// Classe les livres contre une requête en langage ordinaire.
+    ///
+    /// **Le littéral d'abord, le sens ensuite — et mesuré.** La recherche ne
+    /// reposait que sur les embeddings d'Apple. Relevé le 10 septembre 2026
+    /// sur la bibliothèque de démonstration :
+    ///
+    ///     « un roman sur la mer »      L'Étranger 0,718 · Vingt mille lieues
+    ///                                  sous les mers 0,605 — DERNIER
+    ///     « une histoire d'épidémie »  Le Petit Prince 0,697 · La Peste 0,634
+    ///     « un livre pour enfants »    L'Étranger 0,725 · Le Petit Prince 0,721
+    ///
+    /// Les écarts sont de l'ordre du centième sur des livres qui n'ont rien à
+    /// voir : `NLEmbedding.sentenceEmbedding` en français ne discrimine pas à
+    /// cette échelle. Autrement dit, la « recherche par idée » classait au
+    /// hasard, et l'exemple affiché dans le champ était le pire cas.
+    ///
+    /// Le score littéral, lui, sait où il regarde : un mot du titre pèse plus
+    /// qu'un mot du résumé, et « mer » retrouve « les mers ».
     func search(query: String, in books: [Book]) -> [Book] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return books }
 
-        guard let embedding,
-              let queryVector = embedding.vector(for: trimmed.lowercased()) else {
-            return textFallback(query: trimmed, in: books)
-        }
+        let words = Self.meaningfulWords(in: trimmed)
+        guard !words.isEmpty else { return books }
 
-        let scored: [(Book, Double)] = books.map { book in
-            if let data = book.embedding {
-                let bookVector = decode(data)
-                return (book, cosineSimilarity(queryVector, bookVector))
-            }
-            // No stored vector: cheap lexical score so the book still surfaces.
-            let haystack = book.semanticText.lowercased()
-            return (book, haystack.contains(trimmed.lowercased()) ? 0.6 : 0)
-        }
-
-        return scored
-            .filter { $0.1 > 0.15 }
+        let scored = books.map { ($0, Self.score(words: words, in: $0)) }
+            .filter { $0.1 > 0 }
             .sorted { $0.1 > $1.1 }
-            .map(\.0)
+        return scored.map(\.0)
+    }
+
+    // MARK: - Le score littéral
+
+    /// Mots vides du français, plus ceux qui ne discriminent rien dans une
+    /// bibliothèque : « livre » est vrai de tous les livres.
+    private static let stopWords: Set<String> = [
+        "le", "la", "les", "un", "une", "des", "du", "de", "au", "aux", "et", "ou",
+        "sur", "sous", "pour", "avec", "sans", "dans", "par", "en", "a", "quelque",
+        "chose", "livre", "livres", "truc", "qui", "que", "quoi", "est", "sont",
+        "mon", "ma", "mes", "ton", "ta", "tes", "son", "sa", "ses", "ce", "cette",
+    ]
+
+    /// Découpe la requête en mots utiles, sans accents ni casse.
+    static func meaningfulWords(in query: String) -> [String] {
+        query.folding(options: [.diacriticInsensitive, .caseInsensitive],
+                      locale: Locale(identifier: "fr_FR"))
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .filter { $0.count >= 3 && !stopWords.contains($0) }
+    }
+
+    /// Un mot vaut selon l'endroit où il tombe : le titre dit le sujet, le
+    /// résumé le raconte, l'éditeur ne dit rien.
+    static func score(words: [String], in book: Book) -> Int {
+        func normalize(_ text: String) -> String {
+            text.folding(options: [.diacriticInsensitive, .caseInsensitive],
+                         locale: Locale(identifier: "fr_FR"))
+        }
+        let title = normalize(book.title)
+        let authors = normalize(book.authorsLabel)
+        let subjects = normalize(book.subjects.joined(separator: " "))
+        let summary = normalize(book.bookDescription ?? "")
+
+        var total = 0
+        for word in words {
+            // Le radical suffit : « mer » doit retrouver « les mers », et
+            // « épidémie » « une épidémie ». Trois lettres au minimum, sinon
+            // « art » retrouverait « partie ».
+            let stem = String(word.prefix(max(3, word.count - 2)))
+            if title.contains(stem) { total += 5 }
+            if subjects.contains(stem) { total += 3 }
+            if authors.contains(stem) { total += 3 }
+            if summary.contains(stem) { total += 1 }
+        }
+        return total
     }
 
     private func decode(_ data: Data) -> [Double] {
@@ -75,8 +125,4 @@ struct SemanticSearchService {
         return dot / (magA.squareRoot() * magB.squareRoot())
     }
 
-    private func textFallback(query: String, in books: [Book]) -> [Book] {
-        let q = query.lowercased()
-        return books.filter { $0.semanticText.lowercased().contains(q) }
-    }
 }

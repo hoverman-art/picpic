@@ -42,6 +42,9 @@ struct HomeView: View {
     /// Ce que les catalogues ouverts proposent pour la recherche en cours.
     @State private var catalogResults: [CatalogResult] = []
     @State private var catalogSearching = false
+    /// Émissions gratuites qui parlent du sujet cherché.
+    @State private var podcasts: [Podcast] = []
+    @State private var resolvingPodcast: String?
     /// Ce que la recherche visuelle a demandé d'ouvrir.
     @State private var pending = PendingBook.shared
     @FocusState private var searchFocused: Bool
@@ -69,6 +72,7 @@ struct HomeView: View {
                     // BU, la série et la bannière Pro sont descendues sous elle.
                     if !searchText.isEmpty {
                         catalogSection
+                        podcastSection
                     }
 
                     if books.isEmpty {
@@ -114,13 +118,17 @@ struct HomeView: View {
                 let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard query.count >= 3 else {
                     catalogResults = []
+                    podcasts = []
                     catalogSearching = false
                     return
                 }
                 catalogSearching = true
                 try? await Task.sleep(for: .milliseconds(450))
                 guard !Task.isCancelled else { return }
-                catalogResults = await CatalogSearchService.shared.search(query)
+                async let books = CatalogSearchService.shared.search(query)
+                async let shows = PodcastService.shared.search(query)
+                catalogResults = await books
+                podcasts = await shows
                 catalogSearching = false
             }
             .navigationDestination(for: Book.self) { book in
@@ -440,6 +448,85 @@ struct HomeView: View {
         .padding(12)
         .background(.white, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
         .shadow(color: Theme.ink.opacity(0.05), radius: 8, y: 3)
+    }
+
+    /// Ce qui se dit là-dessus, gratuitement, à l'oreille.
+    ///
+    /// L'ordre est celui de l'annuaire d'Apple — voir PodcastService pour
+    /// pourquoi on ne le reclasse pas.
+    @ViewBuilder
+    private var podcastSection: some View {
+        if !podcasts.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("À écouter là-dessus")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .accessibilityIdentifier("home.podcastResults")
+                Text("Des émissions gratuites, jouées depuis le flux de leur auteur.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(podcasts) { podcast in
+                    podcastRow(podcast)
+                }
+            }
+        }
+    }
+
+    private func podcastRow(_ podcast: Podcast) -> some View {
+        Button {
+            Task { await openPodcast(podcast) }
+        } label: {
+            HStack(spacing: 12) {
+                AsyncImage(url: podcast.artworkURLString.flatMap(URL.init(string:))) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        ZStack {
+                            Theme.teal.opacity(0.12)
+                            Image(systemName: "waveform")
+                                .foregroundStyle(Theme.teal)
+                        }
+                    }
+                }
+                .frame(width: 46, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(podcast.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text([podcast.author, podcast.genre].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if resolvingPodcast == podcast.id {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "play.circle")
+                        .font(.title3)
+                        .foregroundStyle(Theme.teal)
+                }
+            }
+            .padding(12)
+            .background(.white, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+            .shadow(color: Theme.ink.opacity(0.05), radius: 8, y: 3)
+        }
+        .buttonStyle(PressableStyle())
+        .disabled(resolvingPodcast != nil)
+        .accessibilityIdentifier("home.podcastRow")
+    }
+
+    /// Le flux n'est lu qu'au moment d'écouter : six cents kilooctets pour cent
+    /// épisodes, ce n'est pas ce qu'on télécharge en tapant une recherche.
+    private func openPodcast(_ podcast: Podcast) async {
+        resolvingPodcast = podcast.id
+        defer { resolvingPodcast = nil }
+        playingAudiobook = await PodcastService.shared.episodes(of: podcast)
     }
 
     private var bookShelf: some View {
